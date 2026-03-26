@@ -10,6 +10,10 @@ def test_slugify():
 def test_clean_wikilinks():
     assert clean_wikilinks("[[Link]]") == "Link"
     assert clean_wikilinks("Text with [[Link]] and [[Another]]") == "Text with Link and Another"
+    assert clean_wikilinks("[[Link|Alias]]") == "Alias"
+    assert clean_wikilinks("[[Link#Header]]") == "Link"
+    assert clean_wikilinks("[[Link#Header|Alias]]") == "Alias"
+    assert clean_wikilinks("Check [[Post|this out]]") == "Check this out"
 
 def test_convert_body_syntax():
     body = "![[image.jpg]]\n![[photo.png|Alt Text]]\n> [!info] Tip\n> Content"

@@ -13,8 +13,14 @@ def slugify(text: str) -> str:
     return re.sub(r"[-\s]+", "-", text)
 
 def clean_wikilinks(text: str) -> str:
-    """Remove Obsidian wiki-link syntax [[...]] from string"""
-    return re.sub(r"\[\[([^\]]+)\]\]", r"\1", text)
+    """
+    Remove Obsidian wiki-link syntax [[...]] from string.
+    Handles aliased links [[Link|Alias]] -> Alias
+    and headers [[Link#Header]] -> Link
+    """
+    # Pattern to match [[Link#Header|Alias]]
+    # Group 1: Link, Group 2: Alias (optional)
+    return re.sub(r"\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]", lambda m: m.group(2) or m.group(1), text)
 
 def yaml_str(value: str) -> str:
     """Escape a value for embedding in a YAML double-quoted string."""
