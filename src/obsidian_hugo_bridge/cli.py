@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 import typer
 from typing_extensions import Annotated
 from git import Repo
@@ -41,6 +41,7 @@ def publish_post(
     input_file: Annotated[Path, typer.Argument(help="Path to Obsidian markdown file")],
     hugo_dir: Annotated[Optional[Path], typer.Option("--hugo-dir", "-d", help="Path to Hugo site root")] = None,
     vault_path: Annotated[Optional[Path], typer.Option("--vault-path", "-v", help="Vault root for image search")] = None,
+    attachment_folder: Annotated[Optional[List[str]], typer.Option("--attachment-folder", "-a", help="Subfolder in vault to search for images (repeatable)")] = None,
     slug: Annotated[Optional[str], typer.Option("--slug", "-s", help="Override output slug")] = None,
     dry_run: Annotated[bool, dry_run_option()] = False,
     no_llm: Annotated[bool, no_llm_option()] = False,
@@ -58,6 +59,9 @@ def publish_post(
     
     vault_path = vault_path or (Path(OBSIDIAN_VAULT_PATH) if OBSIDIAN_VAULT_PATH else None)
     
+    # Use defaults if not provided
+    folders = attachment_folder or ["attachments", "images"]
+    
     if verbose:
         print(f"🚀 Publishing post: {input_file.name}")
         
@@ -66,6 +70,7 @@ def publish_post(
         hugo_dir,
         slug=slug,
         vault_path=vault_path,
+        attachment_folders=folders,
         dry_run=dry_run,
         no_llm=no_llm,
         verbose=verbose,

@@ -70,17 +70,22 @@ def copy_images(
     source_dir: Path, 
     dest_dir: Path, 
     vault_path: Optional[Path] = None,
+    attachment_folders: Optional[List[str]] = None,
     verbose: bool = False
 ) -> List[str]:
     """
     Find images in body and copy them to dest_dir.
-    Searches in source_dir and then vault_path if provided.
+    Searches in:
+    1. source_dir (common for page bundles)
+    2. attachment_folders (relative to vault_path)
+    3. full vault_path (fallback rglob)
+    
     Returns list of copied image names.
     """
     copied = []
     image_exts = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
     
-    # 1. Copy all images from the source directory (common for page bundles or attachments)
+    # 1. Copy all images from the source directory
     if source_dir.exists():
         for img_file in source_dir.iterdir():
             if img_file.is_file() and img_file.suffix.lower() in image_exts:
@@ -89,8 +94,7 @@ def copy_images(
                 if verbose:
                     print(f"   ✓ Copied from source: {img_file.name}")
 
-    # 2. Extract referenced images from body to ensure we didn't miss any in the vault
-    # Standard markdown syntax: ![alt](path)
+    # 2. Extract referenced images from body
     referenced = re.findall(r"!\[.*?\]\(([^)]+)\)", body)
     
     if vault_path and vault_path.exists():
@@ -109,12 +113,28 @@ def copy_images(
                 continue
             
             if not dest.exists():
-                # Search vault
-                matches = list(vault_path.rglob(img_name))
-                if matches:
-                    shutil.copy2(matches[0], dest)
-                    copied.append(img_name)
+                # Search priority folders first
+                found = False
+                if attachment_folders:
+                    for folder in attachment_folders:
+                        search_path = vault_path / folder / img_name
+                        if search_path.exists():
+                            shutil.copy2(search_path, dest)
+                            copied.append(img_name)
+                            found = True
+                            if verbose:
+                                print(f"   ✓ Copied from attachment folder ({folder}): {img_name}")
+                            break
+                
+                # Fallback to full vault search if not found
+                if not found:
                     if verbose:
-                        print(f"   ✓ Copied from vault: {img_name}")
+                        print(f"   🔍 Image not in priority folders, searching full vault: {img_name}")
+                    matches = list(vault_path.rglob(img_name))
+                    if matches:
+                        shutil.copy2(matches[0], dest)
+                        copied.append(img_name)
+                        if verbose:
+                            print(f"   ✓ Copied from vault (rglob): {img_name}")
     
     return copied

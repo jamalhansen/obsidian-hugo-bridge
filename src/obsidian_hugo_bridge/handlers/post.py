@@ -1,6 +1,6 @@
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 import re
 import frontmatter
 from ..core import parse_obsidian_post, convert_body_syntax, copy_images, generate_image_alt
@@ -12,6 +12,7 @@ def handle_post(
     hugo_dir: Path,
     slug: Optional[str] = None,
     vault_path: Optional[Path] = None,
+    attachment_folders: Optional[List[str]] = None,
     dry_run: bool = False,
     no_llm: bool = False,
     verbose: bool = False,
@@ -57,6 +58,7 @@ def handle_post(
             input_path.parent,
             blog_dir,
             vault_path=vault_path,
+            attachment_folders=attachment_folders,
             verbose=verbose
         )
     else:

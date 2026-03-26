@@ -58,3 +58,25 @@ def test_handle_post_auto_alt(mock_input_file, mock_hugo_dir):
         content = (target_dir / "index.md").read_text()
         assert "alt: A generated description" in content
         assert "![A generated description](img.png)" in content
+
+def test_handle_post_attachment_folders(tmp_path, mock_hugo_dir):
+    # Setup mock vault
+    vault_dir = tmp_path / "vault"
+    vault_dir.mkdir()
+    attach_dir = vault_dir / "attachments"
+    attach_dir.mkdir()
+    (attach_dir / "vault_img.png").write_text("fake image content")
+    
+    input_file = tmp_path / "post.md"
+    input_file.write_text("---\ntitle: Post with Vault Image\n---\nHere is an image: ![vault_img.png](vault_img.png)", encoding="utf-8")
+    
+    target_dir = handle_post(
+        input_file,
+        mock_hugo_dir,
+        vault_path=vault_dir,
+        attachment_folders=["attachments"],
+        dry_run=False
+    )
+    
+    assert (target_dir / "vault_img.png").exists()
+    assert (target_dir / "vault_img.png").read_text() == "fake image content"
