@@ -1,5 +1,4 @@
 from typing import Any, Dict
-import re
 
 def normalize_papermod(metadata: Dict[str, Any]) -> Dict[str, Any]:
     """Normalize frontmatter field names to PaperMod theme conventions."""
@@ -24,9 +23,12 @@ def normalize_papermod(metadata: Dict[str, Any]) -> Dict[str, Any]:
         if key in new_metadata:
             unsplash_info[key.replace("unsplash_", "")] = new_metadata.pop(key)
     
-    if "name" in unsplash_info: unsplash_info["name"] = unsplash_info.pop("name") # Keep as name
-    if "user" in unsplash_info: unsplash_info["username"] = unsplash_info.pop("user")
-    if "id" in unsplash_info: unsplash_info["photo_id"] = unsplash_info.pop("id")
+    if "name" in unsplash_info:
+        unsplash_info["name"] = unsplash_info.pop("name") # Keep as name
+    if "user" in unsplash_info:
+        unsplash_info["username"] = unsplash_info.pop("user")
+    if "id" in unsplash_info:
+        unsplash_info["photo_id"] = unsplash_info.pop("id")
 
     # Cover image handling
     if "image" in new_metadata:

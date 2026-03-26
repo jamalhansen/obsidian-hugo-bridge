@@ -1,9 +1,14 @@
 import re
 import shutil
+import base64
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, List
 import frontmatter
 from .utils import clean_wikilinks
+from local_first_common.cli import resolve_provider
+from local_first_common.tracking import register_tool, timed_run
+
+_TOOL = register_tool("obsidian-hugo-bridge")
 
 def parse_obsidian_post(content: str) -> frontmatter.Post:
     """Parse Obsidian markdown content into a frontmatter.Post object."""
@@ -27,13 +32,46 @@ def convert_body_syntax(body: str) -> str:
     body = re.sub(r"^>\s+\[!(\w+)\]\+?\s*(.*)", r"> **\1**: \2", body, flags=re.MULTILINE | re.IGNORECASE)
     return body
 
+def generate_image_alt(image_path: Path, model: str = "@vision", verbose: bool = False) -> Optional[str]:
+    """Generate an alt tag for an image using a vision model."""
+    if not image_path.exists():
+        if verbose:
+            print(f"   ⚠️  Image not found for alt generation: {image_path}")
+        return None
+
+    try:
+        with open(image_path, "rb") as f:
+            img_base64 = base64.b64encode(f.read()).decode("utf-8")
+
+        # Vision model is always local (Ollama) as per user request
+        llm = resolve_provider(provider_name="ollama", model=model)
+        system = "You are a helpful assistant that writes concise, descriptive alt text for images."
+        user = "Describe this image in one short sentence (max 120 characters) for use as alt text. Be objective and specific."
+
+        if verbose:
+            print(f"🧠 Generating alt text for {image_path.name}...")
+
+        with timed_run("obsidian-hugo-bridge", llm.model, source_location=str(image_path)) as _run:
+            description = llm.complete(system, user, images=[img_base64])
+            _run.item_count = 1
+            
+        if isinstance(description, dict):
+            # This shouldn't happen based on the prompt but handle it just in case
+            description = str(description)
+            
+        return description.strip().strip("\"")
+    except Exception as e:
+        if verbose:
+            print(f"   ⚠️  Alt generation failed for {image_path.name}: {e}")
+        return None
+
 def copy_images(
     body: str, 
     source_dir: Path, 
     dest_dir: Path, 
     vault_path: Optional[Path] = None,
     verbose: bool = False
-) -> list[str]:
+) -> List[str]:
     """
     Find images in body and copy them to dest_dir.
     Searches in source_dir and then vault_path if provided.

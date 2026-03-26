@@ -22,7 +22,7 @@ dependencies = [
 obsidian-hugo = "obsidian_hugo_bridge.cli:app"
 
 [tool.uv.sources]
-local-first-common = { path = "../local-first-common", editable = true }
+local-first-common = { git = "https://github.com/jamalhansen/local-first-common.git", branch = "main" }
 
 [build-system]
 requires = ["hatchling"]

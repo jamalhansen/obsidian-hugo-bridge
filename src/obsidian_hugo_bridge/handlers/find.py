@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
 import frontmatter
-from ..utils import slugify, yaml_str
+from ..utils import slugify
 from local_first_common.cli import resolve_provider
 from local_first_common.tracking import register_tool, timed_run
 

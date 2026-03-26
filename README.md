@@ -36,6 +36,7 @@ The tool respects the following environment variables:
 - **Frontmatter normalization**: Converts Obsidian fields to PaperMod theme conventions (extensible).
 - **Body syntax conversion**: Handles Obsidian wikilinks (`![[image]]`), callouts, etc.
 - **Image copying**: Automatically copies referenced images from the source or the vault into the page bundle.
+- **Vision-powered Alt Tags**: Automatically generates descriptive alt text for images (including the cover image) using a local Ollama vision model (e.g., `llama3.2-vision`) when `--auto-alt` is used.
 - **oEmbed support**: Fetches pre-rendered embed HTML for X, Bluesky, and Mastodon links in "finds".
 - **LLM-generated descriptions**: (Optional) Generates meta descriptions if missing.
 - **Git integration**: Automatically adds and commits changes if `--commit` is used.
