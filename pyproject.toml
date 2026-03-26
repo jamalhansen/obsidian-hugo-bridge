@@ -1,0 +1,35 @@
+[project]
+name = "obsidian-hugo-bridge"
+version = "0.1.0"
+description = "A standalone CLI tool that converts Obsidian markdown to Hugo-compatible page bundles."
+readme = "README.md"
+authors = [
+    { name = "Jamal Hansen", email = "jamal.hansen@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "gitpython>=3.1.46",
+    "httpx>=0.28.1",
+    "local-first-common",
+    "pydantic>=2.12.5",
+    "python-frontmatter>=1.1.0",
+    "pyyaml>=6.0.3",
+    "rich>=14.3.3",
+    "typer>=0.24.1",
+]
+
+[project.scripts]
+obsidian-hugo = "obsidian_hugo_bridge.cli:app"
+
+[tool.uv.sources]
+local-first-common = { path = "../local-first-common", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.1.0",
+]
