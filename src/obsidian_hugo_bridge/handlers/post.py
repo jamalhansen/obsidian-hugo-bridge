@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional, List
 import re
 import frontmatter
-from ..core import parse_obsidian_post, convert_body_syntax, copy_images, generate_image_alt
+from ..logic import parse_obsidian_post, convert_body_syntax, copy_images, generate_image_alt
 from ..themes.papermod import normalize_papermod
 from ..utils import slugify
 

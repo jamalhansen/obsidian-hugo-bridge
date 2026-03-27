@@ -1,5 +1,5 @@
 from obsidian_hugo_bridge.utils import slugify, clean_wikilinks
-from obsidian_hugo_bridge.core import convert_body_syntax
+from obsidian_hugo_bridge.logic import convert_body_syntax
 from obsidian_hugo_bridge.themes.papermod import normalize_papermod
 
 def test_slugify():
