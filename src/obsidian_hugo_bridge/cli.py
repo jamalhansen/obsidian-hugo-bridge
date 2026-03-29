@@ -11,17 +11,14 @@ from local_first_common.cli import (
     verbose_option,
     resolve_dry_run,
 )
-from local_first_common.tracking import register_tool
 from .handlers.post import handle_post
 from .handlers.find import handle_find
-
-_TOOL = register_tool("obsidian-hugo-bridge")
 
 app = typer.Typer(help="Obsidian to Hugo Converter")
 publish_app = typer.Typer(help="Publish content to Hugo")
 app.add_typer(publish_app, name="publish")
 
-HUGO_SITE_DIR = os.environ.get("HUGO_SITE_DIR")
+BLOG_PATH = os.environ.get("BLOG_PATH")
 OBSIDIAN_VAULT_PATH = os.environ.get("OBSIDIAN_VAULT_PATH")
 
 def commit_changes(hugo_dir: Path, target_dir: Path, slug: str, content_type: str):
@@ -52,9 +49,9 @@ def publish_post(
 ):
     """Publish a blog post."""
     dry_run = resolve_dry_run(dry_run, no_llm)
-    hugo_dir = hugo_dir or (Path(HUGO_SITE_DIR) if HUGO_SITE_DIR else None)
+    hugo_dir = hugo_dir or (Path(BLOG_PATH) if BLOG_PATH else None)
     if not hugo_dir:
-        typer.secho("Error: Hugo site directory not specified. Use --hugo-dir or set HUGO_SITE_DIR.", fg=typer.colors.RED)
+        typer.secho("Error: Hugo site directory not specified. Use --hugo-dir or set BLOG_PATH.", fg=typer.colors.RED)
         raise typer.Exit(1)
     
     vault_path = vault_path or (Path(OBSIDIAN_VAULT_PATH) if OBSIDIAN_VAULT_PATH else None)
@@ -97,9 +94,9 @@ def publish_find(
 ):
     """Publish a find."""
     dry_run = resolve_dry_run(dry_run, no_llm)
-    hugo_dir = hugo_dir or (Path(HUGO_SITE_DIR) if HUGO_SITE_DIR else None)
+    hugo_dir = hugo_dir or (Path(BLOG_PATH) if BLOG_PATH else None)
     if not hugo_dir:
-        typer.secho("Error: Hugo site directory not specified. Use --hugo-dir or set HUGO_SITE_DIR.", fg=typer.colors.RED)
+        typer.secho("Error: Hugo site directory not specified. Use --hugo-dir or set BLOG_PATH.", fg=typer.colors.RED)
         raise typer.Exit(1)
         
     if verbose:

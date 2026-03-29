@@ -28,7 +28,7 @@ obsidian-hugo publish post input.md --hugo-dir ~/projects/mysite --dry-run
 ## Configuration
 
 The tool respects the following environment variables:
-- `HUGO_SITE_DIR`: Path to the Hugo site root.
+- `BLOG_PATH`: Path to the Hugo site root.
 - `OBSIDIAN_VAULT`: Path to the Obsidian vault root (used for image search).
 
 ## Features
