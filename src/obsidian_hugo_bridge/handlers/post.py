@@ -25,11 +25,10 @@ def handle_post(
     
     # 1. Normalize slug
     if not slug:
-        title = post.metadata.get("title") or input_path.stem
-        slug = slugify(title)
-    else:
-        slug = slugify(slug)
-        
+        slug = post.metadata.get("slug") or post.metadata.get("title") or input_path.stem
+    
+    slug = slugify(slug)
+    
     # 2. Frontmatter normalization
     post.metadata = normalize_papermod(post.metadata)
     
@@ -47,7 +46,18 @@ def handle_post(
     post.content = convert_body_syntax(post.content)
     
     # 4. Setup directory
-    blog_dir = hugo_dir / "content" / "blog" / slug
+    series = post.metadata.get("series")
+    if series:
+        if isinstance(series, list):
+            # If multiple series, use the first one for the folder structure
+            series_name = series[0]
+        else:
+            series_name = series
+        series_slug = slugify(series_name)
+        blog_dir = hugo_dir / "content" / "blog" / series_slug / slug
+    else:
+        blog_dir = hugo_dir / "content" / "blog" / slug
+
     if not dry_run:
         blog_dir.mkdir(parents=True, exist_ok=True)
         

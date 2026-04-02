@@ -69,7 +69,8 @@ def handle_find(
         stem = re.sub(r"^\d+-", "", input_path.stem)
         source_title = stem.replace("-", " ").title()
         
-    slug = slugify(source_title)
+    slug = post.metadata.get("slug") or slugify(source_title)
+    slug = slugify(slug)
     
     captured = post.metadata.get("captured")
     if captured and isinstance(captured, (str, datetime)):

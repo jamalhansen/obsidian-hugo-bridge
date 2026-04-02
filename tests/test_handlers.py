@@ -80,3 +80,38 @@ def test_handle_post_attachment_folders(tmp_path, mock_hugo_dir):
     
     assert (target_dir / "vault_img.png").exists()
     assert (target_dir / "vault_img.png").read_text() == "fake image content"
+
+def test_handle_post_series_and_slug(tmp_path, mock_hugo_dir):
+    input_file = tmp_path / "post_with_series.md"
+    input_file.write_text("---\ntitle: My Post\nseries: Local-First AI\nslug: custom-slug\n---\nBody", encoding="utf-8")
+    
+    target_dir = handle_post(input_file, mock_hugo_dir, dry_run=False)
+    
+    # Expected path: content/blog/local-first-ai/custom-slug
+    expected_path = mock_hugo_dir / "content" / "blog" / "local-first-ai" / "custom-slug"
+    assert target_dir == expected_path
+    assert target_dir.exists()
+    assert (target_dir / "index.md").exists()
+    
+def test_handle_post_series_list(tmp_path, mock_hugo_dir):
+    input_file = tmp_path / "post_with_series_list.md"
+    # Using a list for series (common in some frontmatter setups)
+    input_file.write_text("---\ntitle: My Post\nseries: [\"Local-First AI\", \"Another Series\"]\n---\nBody", encoding="utf-8")
+    
+    target_dir = handle_post(input_file, mock_hugo_dir, dry_run=False)
+    
+    # Expected path: content/blog/local-first-ai/my-post
+    expected_path = mock_hugo_dir / "content" / "blog" / "local-first-ai" / "my-post"
+    assert target_dir == expected_path
+    assert target_dir.exists()
+
+def test_handle_find_custom_slug(tmp_path, mock_hugo_dir):
+    input_file = tmp_path / "find_with_slug.md"
+    input_file.write_text("---\nsource_title: Great Resource\nslug: my-custom-find\n---\nCommentary", encoding="utf-8")
+    
+    target_dir = handle_find(input_file, mock_hugo_dir, dry_run=False, no_llm=True)
+    
+    # Expected path: content/finds/my-custom-find
+    expected_path = mock_hugo_dir / "content" / "finds" / "my-custom-find"
+    assert target_dir == expected_path
+    assert target_dir.exists()

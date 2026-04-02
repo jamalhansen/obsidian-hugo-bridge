@@ -10,19 +10,21 @@ uv tool install obsidian-hugo-bridge
 
 ## Usage
 
+The tool is available as `obsidian-hugo` after `uv sync`.
+
 ### Publish a blog post
 ```bash
-obsidian-hugo publish post input.md --hugo-dir ~/projects/jamalhansen.com
+uv run obsidian-hugo publish post input.md --hugo-dir ~/projects/jamalhansen.com
 ```
 
 ### Publish a "find" (bookmark)
 ```bash
-obsidian-hugo publish find input.md --hugo-dir ~/projects/jamalhansen.com
+uv run obsidian-hugo publish find input.md --hugo-dir ~/projects/jamalhansen.com
 ```
 
 ### Preview without writing
 ```bash
-obsidian-hugo publish post input.md --hugo-dir ~/projects/mysite --dry-run
+uv run obsidian-hugo publish post input.md --hugo-dir ~/projects/mysite --dry-run
 ```
 
 ## Configuration
