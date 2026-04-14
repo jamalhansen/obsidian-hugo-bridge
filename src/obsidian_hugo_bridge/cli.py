@@ -5,12 +5,7 @@ import typer
 from typing_extensions import Annotated
 from git import Repo
 
-from local_first_common.cli import (
-    dry_run_option,
-    no_llm_option,
-    verbose_option,
-    resolve_dry_run,
-)
+from local_first_common.cli import resolve_dry_run
 from .handlers.post import handle_post
 from .handlers.find import handle_find
 
@@ -40,9 +35,9 @@ def publish_post(
     vault_path: Annotated[Optional[Path], typer.Option("--vault-path", "-v", help="Vault root for image search")] = None,
     attachment_folder: Annotated[Optional[List[str]], typer.Option("--attachment-folder", "-a", help="Subfolder in vault to search for images (repeatable)")] = None,
     slug: Annotated[Optional[str], typer.Option("--slug", "-s", help="Override output slug")] = None,
-    dry_run: Annotated[bool, dry_run_option()] = False,
-    no_llm: Annotated[bool, no_llm_option()] = False,
-    verbose: Annotated[bool, verbose_option()] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run", "-n", help="Preview without writing to disk.")] = False,
+    no_llm: Annotated[bool, typer.Option("--no-llm", help="Skip LLM calls. Implies --dry-run.")] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", "-V", help="Show extra debug output.")] = False,
     commit: Annotated[bool, typer.Option("--commit", help="Git commit after writing")] = False,
     auto_alt: Annotated[bool, typer.Option("--auto-alt", help="Automatically generate alt text for images using vision LLM")] = False,
     vision_model: Annotated[str, typer.Option("--vision-model", help="Vision model to use for alt text generation")] = "@vision",
@@ -86,9 +81,9 @@ def publish_post(
 def publish_find(
     input_file: Annotated[Path, typer.Argument(help="Path to Obsidian markdown file")],
     hugo_dir: Annotated[Optional[Path], typer.Option("--hugo-dir", "-d", help="Path to Hugo site root")] = None,
-    dry_run: Annotated[bool, dry_run_option()] = False,
-    no_llm: Annotated[bool, no_llm_option()] = False,
-    verbose: Annotated[bool, verbose_option()] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run", "-n", help="Preview without writing to disk.")] = False,
+    no_llm: Annotated[bool, typer.Option("--no-llm", help="Skip LLM calls. Implies --dry-run.")] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", "-V", help="Show extra debug output.")] = False,
     commit: Annotated[bool, typer.Option("--commit", help="Git commit after writing")] = False,
     vision_model: Annotated[str, typer.Option("--vision-model", help="Vision model to use for alt text generation")] = "@vision",
 ):

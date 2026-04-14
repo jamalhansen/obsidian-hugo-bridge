@@ -46,17 +46,29 @@ def handle_post(
     post.content = convert_body_syntax(post.content)
     
     # 4. Setup directory
+    # Tag-based subfolder routing for posts without a series
+    TAG_FOLDERS = {
+        "tsql2sday": "tsql-tuesday",
+    }
+
     series = post.metadata.get("series")
     if series:
-        if isinstance(series, list):
-            # If multiple series, use the first one for the folder structure
-            series_name = series[0]
-        else:
-            series_name = series
+        series_name = series[0] if isinstance(series, list) else series
         series_slug = slugify(series_name)
         blog_dir = hugo_dir / "content" / "blog" / series_slug / slug
     else:
-        blog_dir = hugo_dir / "content" / "blog" / slug
+        # Fall back to tag-based routing
+        tags = post.metadata.get("tags") or []
+        series_slug = next(
+            (TAG_FOLDERS[t.lower()] for t in tags if t.lower() in TAG_FOLDERS),
+            None,
+        )
+        if series_slug:
+            if verbose:
+                print(f"   📂 Routing via tag to subfolder: {series_slug}")
+            blog_dir = hugo_dir / "content" / "blog" / series_slug / slug
+        else:
+            blog_dir = hugo_dir / "content" / "blog" / slug
 
     if not dry_run:
         blog_dir.mkdir(parents=True, exist_ok=True)
