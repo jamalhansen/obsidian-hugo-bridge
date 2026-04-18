@@ -1,3 +1,5 @@
+from local_first_common.config import get_setting
+from local_first_common.cli import init_config_option
 import re
 import shutil
 import base64
@@ -9,6 +11,8 @@ from local_first_common.cli import resolve_provider
 from local_first_common.tracking import register_tool, timed_run
 
 _TOOL = register_tool("obsidian-hugo-bridge")
+TOOL_NAME = "obsidian-hugo-bridge"
+DEFAULTS = {"provider": "ollama", "model": "llama3"}
 
 def parse_obsidian_post(content: str) -> frontmatter.Post:
     """Parse Obsidian markdown content into a frontmatter.Post object."""
@@ -44,7 +48,9 @@ def generate_image_alt(image_path: Path, model: str = "@vision", verbose: bool =
             img_base64 = base64.b64encode(f.read()).decode("utf-8")
 
         # Vision model is always local (Ollama) as per user request
-        llm = resolve_provider(provider_name="ollama", model=model)
+        actual_provider = get_setting(TOOL_NAME, "provider", cli_val=provider, default="ollama")
+    actual_model = get_setting(TOOL_NAME, "model", cli_val=model)
+    llm = resolve_provider(provider_name="ollama", model=model)
         system = "You are a helpful assistant that writes concise, descriptive alt text for images."
         user = "Describe this image in one short sentence (max 120 characters) for use as alt text. Be objective and specific."
 
