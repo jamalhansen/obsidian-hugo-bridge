@@ -12,6 +12,19 @@ _TOOL = register_tool("obsidian-hugo-bridge")
 TOOL_NAME = "obsidian-hugo-bridge"
 DEFAULTS = {"provider": "ollama", "model": "llama3"}
 
+
+class HugoBridgeError(Exception):
+    """Base typed error for obsidian-hugo-bridge."""
+
+
+class ImageAltError(HugoBridgeError):
+    """Raised when alt text generation fails unrecoverably."""
+
+
+class ConversionError(HugoBridgeError):
+    """Raised when Obsidian-to-Hugo content conversion fails."""
+
+
 def parse_obsidian_post(content: str) -> frontmatter.Post:
     """Parse Obsidian markdown content into a frontmatter.Post object."""
     post = frontmatter.loads(content)
@@ -20,8 +33,11 @@ def parse_obsidian_post(content: str) -> frontmatter.Post:
         if isinstance(value, str):
             post.metadata[key] = clean_wikilinks(value)
         elif isinstance(value, list):
-            post.metadata[key] = [clean_wikilinks(v) if isinstance(v, str) else v for v in value]
+            post.metadata[key] = [
+                clean_wikilinks(v) if isinstance(v, str) else v for v in value
+            ]
     return post
+
 
 def convert_body_syntax(body: str) -> str:
     """Convert Obsidian-specific syntax to Hugo-compatible markdown."""
@@ -31,10 +47,18 @@ def convert_body_syntax(body: str) -> str:
     body = re.sub(r"!\[\[([^\]|]+)\|([^\]]+)\]\]", r"![\2](\1)", body)
     # Obsidian callouts [!info] -> Hugo/Goldmark blockquotes (basic support)
     # This is a simple conversion, theme might handle it better with shortcodes
-    body = re.sub(r"^>\s+\[!(\w+)\]\+?\s*(.*)", r"> **\1**: \2", body, flags=re.MULTILINE | re.IGNORECASE)
+    body = re.sub(
+        r"^>\s+\[!(\w+)\]\+?\s*(.*)",
+        r"> **\1**: \2",
+        body,
+        flags=re.MULTILINE | re.IGNORECASE,
+    )
     return body
 
-def generate_image_alt(image_path: Path, model: str = "@vision", verbose: bool = False) -> Optional[str]:
+
+def generate_image_alt(
+    image_path: Path, model: str = "@vision", verbose: bool = False
+) -> Optional[str]:
     """Generate an alt tag for an image using a vision model."""
     if not image_path.exists():
         if verbose:
@@ -53,27 +77,30 @@ def generate_image_alt(image_path: Path, model: str = "@vision", verbose: bool =
         if verbose:
             print(f"🧠 Generating alt text for {image_path.name}...")
 
-        with timed_run("obsidian-hugo-bridge", llm.model, source_location=str(image_path)) as _run:
+        with timed_run(
+            "obsidian-hugo-bridge", llm.model, source_location=str(image_path)
+        ) as _run:
             description = llm.complete(system, user, images=[img_base64])
             _run.item_count = 1
-            
+
         if isinstance(description, dict):
             # This shouldn't happen based on the prompt but handle it just in case
             description = str(description)
-            
-        return description.strip().strip("\"")
+
+        return description.strip().strip('"')
     except Exception as e:
         if verbose:
             print(f"   ⚠️  Alt generation failed for {image_path.name}: {e}")
         return None
 
+
 def copy_images(
-    body: str, 
-    source_dir: Path, 
-    dest_dir: Path, 
+    body: str,
+    source_dir: Path,
+    dest_dir: Path,
     vault_path: Optional[Path] = None,
     attachment_folders: Optional[List[str]] = None,
-    verbose: bool = False
+    verbose: bool = False,
 ) -> List[str]:
     """
     Find images in body and copy them to dest_dir.
@@ -81,12 +108,12 @@ def copy_images(
     1. source_dir (common for page bundles)
     2. attachment_folders (relative to vault_path)
     3. full vault_path (fallback rglob)
-    
+
     Returns list of copied image names.
     """
     copied = []
     image_exts = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
-    
+
     # 1. Copy all images from the source directory
     if source_dir.exists():
         for img_file in source_dir.iterdir():
@@ -98,22 +125,22 @@ def copy_images(
 
     # 2. Extract referenced images from body
     referenced = re.findall(r"!\[.*?\]\(([^)]+)\)", body)
-    
+
     if vault_path and vault_path.exists():
         dest_dir_resolved = dest_dir.resolve()
         for img_name in referenced:
             # Skip if already copied
             if img_name in copied:
                 continue
-            
+
             # Basic security check for path traversal
             if ".." in img_name or img_name.startswith("/"):
                 continue
-                
+
             dest = (dest_dir / img_name).resolve()
             if not dest.is_relative_to(dest_dir_resolved):
                 continue
-            
+
             if not dest.exists():
                 # Search priority folders first
                 found = False
@@ -125,18 +152,22 @@ def copy_images(
                             copied.append(img_name)
                             found = True
                             if verbose:
-                                print(f"   ✓ Copied from attachment folder ({folder}): {img_name}")
+                                print(
+                                    f"   ✓ Copied from attachment folder ({folder}): {img_name}"
+                                )
                             break
-                
+
                 # Fallback to full vault search if not found
                 if not found:
                     if verbose:
-                        print(f"   🔍 Image not in priority folders, searching full vault: {img_name}")
+                        print(
+                            f"   🔍 Image not in priority folders, searching full vault: {img_name}"
+                        )
                     matches = list(vault_path.rglob(img_name))
                     if matches:
                         shutil.copy2(matches[0], dest)
                         copied.append(img_name)
                         if verbose:
                             print(f"   ✓ Copied from vault (rglob): {img_name}")
-    
+
     return copied
