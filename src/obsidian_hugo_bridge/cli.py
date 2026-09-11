@@ -1,12 +1,13 @@
 import os
 from pathlib import Path
-from typing import Annotated, List, Optional
+from typing import Annotated
+
 import typer
 from git import Repo
-
 from local_first_common.cli import init_config_option, resolve_dry_run
-from .handlers.post import handle_post
+
 from .handlers.find import handle_find
+from .handlers.post import handle_post
 
 TOOL_NAME = "obsidian-hugo-bridge"
 DEFAULTS = {"provider": "ollama", "model": "llama3"}
@@ -28,7 +29,7 @@ def commit_changes(hugo_dir: Path, target_dir: Path, slug: str, content_type: st
         repo.index.add([str(rel_path)])
         repo.index.commit(f"publish({content_type}): {slug}")
         print(f"   ✓ Committed: publish({content_type}): {slug}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - git commit is best-effort here; the file publish itself already succeeded, don't crash on the commit step
         print(f"   ⚠️  Git commit failed: {e}")
 
 
@@ -36,14 +37,14 @@ def commit_changes(hugo_dir: Path, target_dir: Path, slug: str, content_type: st
 def publish_post(
     input_file: Annotated[Path, typer.Argument(help="Path to Obsidian markdown file")],
     hugo_dir: Annotated[
-        Optional[Path], typer.Option("--hugo-dir", "-d", help="Path to Hugo site root")
+        Path | None, typer.Option("--hugo-dir", "-d", help="Path to Hugo site root")
     ] = None,
     vault_path: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option("--vault-path", "-v", help="Vault root for image search"),
     ] = None,
     attachment_folder: Annotated[
-        Optional[List[str]],
+        list[str] | None,
         typer.Option(
             "--attachment-folder",
             "-a",
@@ -51,7 +52,7 @@ def publish_post(
         ),
     ] = None,
     slug: Annotated[
-        Optional[str], typer.Option("--slug", "-s", help="Override output slug")
+        str | None, typer.Option("--slug", "-s", help="Override output slug")
     ] = None,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", "-n", help="Preview without writing to disk.")
@@ -125,7 +126,7 @@ def publish_post(
 def publish_find(
     input_file: Annotated[Path, typer.Argument(help="Path to Obsidian markdown file")],
     hugo_dir: Annotated[
-        Optional[Path], typer.Option("--hugo-dir", "-d", help="Path to Hugo site root")
+        Path | None, typer.Option("--hugo-dir", "-d", help="Path to Hugo site root")
     ] = None,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", "-n", help="Preview without writing to disk.")

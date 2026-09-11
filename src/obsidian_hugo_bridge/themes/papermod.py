@@ -1,7 +1,7 @@
-from typing import Any, Dict
+from typing import Any
 
 
-def normalize_papermod(metadata: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_papermod(metadata: dict[str, Any]) -> dict[str, Any]:
     """Normalize frontmatter field names to PaperMod theme conventions."""
     new_metadata = metadata.copy()
 

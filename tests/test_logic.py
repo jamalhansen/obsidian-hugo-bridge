@@ -1,11 +1,11 @@
-from obsidian_hugo_bridge.utils import slugify, clean_wikilinks
 from obsidian_hugo_bridge.logic import (
-    convert_body_syntax,
+    ConversionError,
     HugoBridgeError,
     ImageAltError,
-    ConversionError,
+    convert_body_syntax,
 )
 from obsidian_hugo_bridge.themes.papermod import normalize_papermod
+from obsidian_hugo_bridge.utils import clean_wikilinks, slugify
 
 
 class TestTypedErrors:

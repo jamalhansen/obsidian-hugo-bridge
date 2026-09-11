@@ -1,12 +1,13 @@
+import base64
 import re
 import shutil
-import base64
 from pathlib import Path
-from typing import Optional, List
+
 import frontmatter
-from .utils import clean_wikilinks
 from local_first_common.cli import resolve_provider
 from local_first_common.tracking import register_tool, timed_run
+
+from .utils import clean_wikilinks
 
 _TOOL = register_tool("obsidian-hugo-bridge")
 TOOL_NAME = "obsidian-hugo-bridge"
@@ -58,7 +59,7 @@ def convert_body_syntax(body: str) -> str:
 
 def generate_image_alt(
     image_path: Path, model: str = "@vision", verbose: bool = False
-) -> Optional[str]:
+) -> str | None:
     """Generate an alt tag for an image using a vision model."""
     if not image_path.exists():
         if verbose:
@@ -88,7 +89,7 @@ def generate_image_alt(
             description = str(description)
 
         return description.strip().strip('"')
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - alt-text generation is best-effort; any LLM failure should skip it, not crash the publish
         if verbose:
             print(f"   ⚠️  Alt generation failed for {image_path.name}: {e}")
         return None
@@ -98,10 +99,10 @@ def copy_images(
     body: str,
     source_dir: Path,
     dest_dir: Path,
-    vault_path: Optional[Path] = None,
-    attachment_folders: Optional[List[str]] = None,
+    vault_path: Path | None = None,
+    attachment_folders: list[str] | None = None,
     verbose: bool = False,
-) -> List[str]:
+) -> list[str]:
     """
     Find images in body and copy them to dest_dir.
     Searches in:

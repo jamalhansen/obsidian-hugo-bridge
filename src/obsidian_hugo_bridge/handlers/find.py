@@ -1,14 +1,17 @@
 import re
-import httpx
-from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, Any
+from pathlib import Path
+from typing import Any
+
 import frontmatter
-from ..utils import slugify
+import httpx
 from local_first_common.cli import resolve_provider
 from local_first_common.tracking import timed_run
 
-def detect_social_platform(url: str) -> Optional[str]:
+from ..utils import slugify
+
+
+def detect_social_platform(url: str) -> str | None:
     """Return 'x', 'bluesky', 'mastodon', or None based on URL pattern."""
     if not url:
         return None
@@ -20,7 +23,7 @@ def detect_social_platform(url: str) -> Optional[str]:
         return "mastodon"
     return None
 
-def fetch_oembed_html(platform: str, url: str) -> Optional[str]:
+def fetch_oembed_html(platform: str, url: str) -> str | None:
     """Fetch pre-rendered embed HTML from the platform's oEmbed API."""
     clean_url = re.sub(r"\?.*$", "", url)
     try:
@@ -36,7 +39,7 @@ def fetch_oembed_html(platform: str, url: str) -> Optional[str]:
             if resp.status_code == 200:
                 data = resp.json()
                 return data.get("html", "").strip()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - oEmbed is a nice-to-have preview; any fetch failure should skip it, not crash the publish
         print(f"⚠️  oEmbed fetch failed for {platform}: {e}")
     return None
 
@@ -79,7 +82,7 @@ def handle_find(
         else:
             date = captured
     else:
-        date = datetime.now().strftime("%Y-%m-%d")
+        date = datetime.now().astimezone().strftime("%Y-%m-%d")
         
     description = post.metadata.get("description")
     if not description:
@@ -100,13 +103,13 @@ def handle_find(
                     _run.output_tokens = getattr(llm, "output_tokens", None)
                     description = result.strip().strip('"')
                 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - LLM description is best-effort; any failure falls back to the extracted-body description, not a crash
                 if verbose:
                     print(f"⚠️  LLM description generation failed: {e}")
                 description = extract_description_from_body(post.content)
     
     # 2. Build Hugo Metadata
-    hugo_meta: Dict[str, Any] = {
+    hugo_meta: dict[str, Any] = {
         "title": source_title,
         "date": date,
         "draft": False,

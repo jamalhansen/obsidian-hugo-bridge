@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import patch
-from obsidian_hugo_bridge.handlers.post import handle_post
+
+import pytest
+
 from obsidian_hugo_bridge.handlers.find import handle_find
+from obsidian_hugo_bridge.handlers.post import handle_post
+
 
 @pytest.fixture
 def mock_hugo_dir(tmp_path):

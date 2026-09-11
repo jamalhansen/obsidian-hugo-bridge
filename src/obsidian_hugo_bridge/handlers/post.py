@@ -1,18 +1,25 @@
-from pathlib import Path
-from datetime import datetime
-from typing import Optional, List
 import re
+from datetime import datetime
+from pathlib import Path
+
 import frontmatter
-from ..core import parse_obsidian_post, convert_body_syntax, copy_images, generate_image_alt
+
+from ..core import (
+    convert_body_syntax,
+    copy_images,
+    generate_image_alt,
+    parse_obsidian_post,
+)
 from ..themes.papermod import normalize_papermod
 from ..utils import slugify
+
 
 def handle_post(
     input_path: Path,
     hugo_dir: Path,
-    slug: Optional[str] = None,
-    vault_path: Optional[Path] = None,
-    attachment_folders: Optional[List[str]] = None,
+    slug: str | None = None,
+    vault_path: Path | None = None,
+    attachment_folders: list[str] | None = None,
     dry_run: bool = False,
     no_llm: bool = False,
     verbose: bool = False,
@@ -36,7 +43,7 @@ def handle_post(
     if "title" not in post.metadata:
         post.metadata["title"] = input_path.stem.replace("-", " ").title()
     if "date" not in post.metadata:
-        post.metadata["date"] = datetime.now().strftime("%Y-%m-%d")
+        post.metadata["date"] = datetime.now().astimezone().strftime("%Y-%m-%d")
     if "author" not in post.metadata:
         post.metadata["author"] = ["Jamal Hansen"]
     if "draft" not in post.metadata:
