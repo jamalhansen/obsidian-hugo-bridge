@@ -92,7 +92,7 @@ def handle_find(
             if verbose:
                 print("🧠 Generating meta description with LLM...")
             try:
-                llm = resolve_provider(no_llm=no_llm)
+                llm = resolve_provider(no_llm=no_llm, tool_name="obsidian-hugo-bridge")
                 system = "You are a helpful assistant that writes concise meta descriptions for blog posts."
                 user = f"Write a 1-sentence meta description (max 160 chars) for this blog post snippet:\n\n{post.content[:1000]}"
                 
