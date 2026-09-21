@@ -5,7 +5,7 @@ from pathlib import Path
 
 import frontmatter
 from local_first_common.cli import resolve_provider
-from local_first_common.tracking import register_tool, timed_run
+from local_first_common.tracking import register_tool
 
 from .utils import clean_wikilinks
 
@@ -78,11 +78,9 @@ def generate_image_alt(
         if verbose:
             print(f"🧠 Generating alt text for {image_path.name}...")
 
-        with timed_run(
-            "obsidian-hugo-bridge", llm.model, source_location=str(image_path)
-        ) as _run:
-            description = llm.complete(system, user, images=[img_base64])
-            _run.item_count = 1
+        llm.source_location = str(image_path)
+        llm.item_count = 1
+        description = llm.complete(system, user, images=[img_base64])
 
         if isinstance(description, dict):
             # This shouldn't happen based on the prompt but handle it just in case

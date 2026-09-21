@@ -6,7 +6,6 @@ from typing import Any
 import frontmatter
 import httpx
 from local_first_common.cli import resolve_provider
-from local_first_common.tracking import timed_run
 
 from ..utils import slugify
 
@@ -96,13 +95,11 @@ def handle_find(
                 system = "You are a helpful assistant that writes concise meta descriptions for blog posts."
                 user = f"Write a 1-sentence meta description (max 160 chars) for this blog post snippet:\n\n{post.content[:1000]}"
                 
-                with timed_run("obsidian-hugo-bridge", llm.model, source_location=str(input_path)) as _run:
-                    result = llm.complete(system, user)
-                    _run.item_count = 1
-                    _run.input_tokens = getattr(llm, "input_tokens", None)
-                    _run.output_tokens = getattr(llm, "output_tokens", None)
-                    description = result.strip().strip('"')
-                
+                llm.source_location = str(input_path)
+                llm.item_count = 1
+                result = llm.complete(system, user)
+                description = result.strip().strip('"')
+
             except Exception as e:  # noqa: BLE001 - LLM description is best-effort; any failure falls back to the extracted-body description, not a crash
                 if verbose:
                     print(f"⚠️  LLM description generation failed: {e}")
