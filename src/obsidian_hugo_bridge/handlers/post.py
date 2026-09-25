@@ -81,6 +81,7 @@ def handle_post(
             vault_path=vault_path,
             attachment_folders=attachment_folders,
             verbose=verbose,
+            extra_images=[post.metadata["cover"]["image"]] if isinstance(post.metadata.get("cover"), dict) else None,
         )
     else:
         print(f"[dry-run] Would copy images to: {blog_dir}")

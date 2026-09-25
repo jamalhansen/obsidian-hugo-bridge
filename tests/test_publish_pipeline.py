@@ -55,6 +55,7 @@ def note(tmp_path: Path) -> Path:
     folder.mkdir(parents=True)
     (folder / "joins.jpg").write_bytes(b"jpg")
     (folder / "diagram.png").write_bytes(b"png")
+    (folder / "linkedin-card.jpg").write_bytes(b"card")  # next to the note, not used by the post
     f = folder / "joins-explained.md"
     f.write_text(VAULT_NOTE, encoding="utf-8")
     return f
@@ -101,6 +102,8 @@ class TestHandlePost:
         assert meta["draft"] is False
         assert meta["cover"]["image"] == "joins.jpg"
         assert (bundle / "joins.jpg").exists()
+        assert (bundle / "diagram.png").exists()
+        assert not (bundle / "linkedin-card.jpg").exists()
         assert "![Image](diagram.png)" in (bundle / "index.md").read_text()
 
     def test_republish_reuses_existing_bundle_wherever_it_lives(self, note, site):

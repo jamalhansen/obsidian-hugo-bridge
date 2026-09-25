@@ -104,6 +104,7 @@ def copy_images(
     vault_path: Path | None = None,
     attachment_folders: list[str] | None = None,
     verbose: bool = False,
+    extra_images: list[str] | None = None,
 ) -> list[str]:
     """
     Find images in body and copy them to dest_dir.
@@ -116,18 +117,19 @@ def copy_images(
     """
     copied = []
     image_exts = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
+    referenced = re.findall(r"!\[.*?\]\(([^)]+)\)", body) + list(extra_images or [])
 
-    # 1. Copy all images from the source directory
+    # 1. Referenced images that sit next to the note. Others in the folder (social cards,
+    # thumbnails) aren't part of the post and stay out of the bundle.
     if source_dir.exists():
         for img_file in source_dir.iterdir():
-            if img_file.is_file() and img_file.suffix.lower() in image_exts:
+            if img_file.is_file() and img_file.suffix.lower() in image_exts and img_file.name in referenced:
                 shutil.copy2(img_file, dest_dir / img_file.name)
                 copied.append(img_file.name)
                 if verbose:
                     print(f"   ✓ Copied from source: {img_file.name}")
 
-    # 2. Extract referenced images from body
-    referenced = re.findall(r"!\[.*?\]\(([^)]+)\)", body)
+    # 2. Referenced images found elsewhere in the vault
 
     if vault_path and vault_path.exists():
         dest_dir_resolved = dest_dir.resolve()
