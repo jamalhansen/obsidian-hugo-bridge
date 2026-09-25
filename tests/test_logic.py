@@ -1,4 +1,4 @@
-from obsidian_hugo_bridge.logic import (
+from obsidian_hugo_bridge.core import (
     ConversionError,
     HugoBridgeError,
     ImageAltError,
