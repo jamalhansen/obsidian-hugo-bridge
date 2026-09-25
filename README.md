@@ -15,7 +15,12 @@ obsidian-hugo publish post <note.md> --hugo-dir ~/projects/jamalhansen.com --vau
 obsidian-hugo publish find <find.md> --hugo-dir ~/projects/jamalhansen.com
 obsidian-hugo preview <note.md> --hugo-dir ~/projects/jamalhansen.com   # draft render in the real theme
 obsidian-hugo drift --hugo-dir ~/projects/jamalhansen.com               # vault vs live disagreements
+obsidian-hugo check --hugo-dir ~/projects/jamalhansen.com [index.md ...]  # frontmatter shape errors
 ```
+
+`check` catches what hand edits in Hugo introduce: a block indented under the wrong key, a missing
+description or date, empty tags, a scalar where Hugo wants a list, a cover image without alt text.
+It exits 1 on errors, so it can gate a pre-commit hook.
 
 `--dry-run` previews without writing. `BLOG_PATH` / `OBSIDIAN_VAULT_PATH` can stand in for
 `--hugo-dir` / `--vault-path`. The blog repo wraps these as `make publish POST=...`,

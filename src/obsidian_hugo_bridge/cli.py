@@ -13,6 +13,7 @@ import typer
 from git import Repo
 from local_first_common.cli import init_config_option, json_option, resolve_dry_run
 
+from .check import check_site
 from .core import OverwriteRefusedError
 from .drift import drift_for, published_notes
 from .handlers.find import handle_find
@@ -233,6 +234,29 @@ def drift(
                 typer.echo(f"      {name}: vault={v!r}  live={lv!r}")
     clean = sum(d.clean for d in results)
     typer.echo(f"\n{clean}/{len(results)} published posts match their live copy")
+
+
+@app.command()
+def check(
+    paths: Annotated[list[Path] | None, typer.Argument(help="index.md files to check (default: every post)")] = None,
+    hugo_dir: HugoDir = None,
+    warnings: Annotated[bool, typer.Option("--warnings/--no-warnings", help="Also list warnings")] = False,
+):
+    """Check Hugo post frontmatter for shape problems. Exits 1 on any error."""
+    hugo = _hugo_dir(hugo_dir)
+    results = check_site(hugo, [p.resolve() for p in paths] if paths else None)
+    n_err = 0
+    for r in results:
+        rel = r.path.relative_to(hugo.resolve()) if r.path.is_relative_to(hugo.resolve()) else r.path
+        for e in r.errors:
+            typer.echo(f"✗ {rel}: {e}")
+            n_err += 1
+        if warnings:
+            for w in r.warnings:
+                typer.echo(f"· {rel}: {w}")
+    typer.echo(f"{len(results)} posts checked, {n_err} errors")
+    if n_err:
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

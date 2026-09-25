@@ -75,7 +75,7 @@ def generate_image_alt(
             img_base64 = base64.b64encode(f.read()).decode("utf-8")
 
         # Vision model is always local (Ollama) as per user request
-        llm = resolve_provider(provider_name="ollama", tool_name=TOOL_NAME)
+        llm = resolve_provider(provider_name="ollama", model=model, tool_name=TOOL_NAME)
         system = "You are a helpful assistant that writes concise, descriptive alt text for images."
         user = "Describe this image in one short sentence (max 120 characters) for use as alt text. Be objective and specific."
 

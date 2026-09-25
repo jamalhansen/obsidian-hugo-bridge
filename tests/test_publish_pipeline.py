@@ -215,3 +215,40 @@ def test_formatting_only_differences_do_not_block(note, site):
     reformatted = frontmatter.dumps(post, sort_keys=True, default_flow_style=True)
     index.write_text(reformatted)
     handle_post(note, site, overwrite=False)
+
+
+class TestCheck:
+    def _post(self, site, name, fm):
+        d = site / "content/blog" / name
+        d.mkdir(parents=True)
+        (d / "index.md").write_text(f"---\n{fm}---\nbody\n")
+        return d / "index.md"
+
+    def test_clean_post_passes(self, site):
+        from obsidian_hugo_bridge.check import check_post
+
+        p = self._post(site, "ok", "title: T\ndate: 2026-01-01\ndescription: D\ntags: [a]\n"
+                                   "series: [S]\ncover:\n  image: a.jpg\n  alt: A thing\n")
+        assert check_post(p).errors == []
+
+    def test_the_bugs_hand_edits_introduce(self, site):
+        from obsidian_hugo_bridge.check import check_post
+
+        p = self._post(site, "bad", "title: T\npublished: 2026-01-01\ntags:\n  - a\n  -\n"
+                                    "series:\n  - cover: x\ncategories: Solo\ncover:\n  image: a.jpg\n  alt: ''\n")
+        errors = check_post(p).errors
+        assert "missing date" not in errors  # `published` is a Hugo date alias
+        assert "missing description" in errors
+        assert any(e.startswith("tags must be") for e in errors)
+        assert any(e.startswith("series must be") for e in errors)
+        assert any(e.startswith("categories must be") for e in errors)
+        assert "cover image has no alt text" in errors
+
+    def test_cli_exit_code_and_preview_is_skipped(self, site):
+        self._post(site, "_preview/draft", "title: T\n")
+        ok = runner.invoke(app, ["check", "--hugo-dir", str(site)])
+        assert ok.exit_code == 0, ok.output
+        self._post(site, "bad", "title: T\n")
+        bad = runner.invoke(app, ["check", "--hugo-dir", str(site)])
+        assert bad.exit_code == 1
+        assert "missing date" in bad.output
