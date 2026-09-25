@@ -1,6 +1,6 @@
 import difflib
 import re
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import frontmatter
@@ -68,13 +68,9 @@ def handle_post(
     index = blog_dir / "index.md"
     if not overwrite and not preview and index.exists():
         # Checked before anything is written, images included.
-        current = index.read_text(encoding="utf-8")
-        proposed = frontmatter.dumps(post, sort_keys=False) + "\n"
-        if current != proposed:
-            raise OverwriteRefusedError("".join(difflib.unified_diff(
-                current.splitlines(keepends=True), proposed.splitlines(keepends=True),
-                fromfile=f"live/{index.relative_to(hugo_dir)}", tofile=f"vault/{input_path.name}",
-            )))
+        changes = semantic_diff(frontmatter.loads(index.read_text(encoding="utf-8")), post)
+        if changes:
+            raise OverwriteRefusedError(f"{index.relative_to(hugo_dir)} (- live, + vault)\n{changes}")
 
     if not dry_run:
         blog_dir.mkdir(parents=True, exist_ok=True)
@@ -92,7 +88,7 @@ def handle_post(
     if auto_alt and not no_llm:
         _fill_alt_text(post, blog_dir, vision_model, verbose)
 
-    final_output = frontmatter.dumps(post, sort_keys=False) + "\n"
+    final_output = frontmatter.dumps(post, sort_keys=False, width=4096, allow_unicode=True) + "\n"
     if dry_run:
         print(f"[dry-run] Would write post to: {blog_dir}/index.md")
         if verbose:
@@ -105,6 +101,37 @@ def handle_post(
             print(f"   ✓ Written: {blog_dir}/index.md")
 
     return blog_dir
+
+
+def _comparable(value):
+    if value in (None, "", [], {}):
+        return None
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()[:10]
+    if isinstance(value, dict):
+        return {k: _comparable(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_comparable(v) for v in value]
+    return value
+
+
+def semantic_diff(live: frontmatter.Post, proposed: frontmatter.Post) -> str:
+    """What re-publishing would change, ignoring YAML formatting. Empty when nothing would."""
+    lines = []
+    for key in dict.fromkeys([*live.metadata, *proposed.metadata]):
+        a, b = _comparable(live.metadata.get(key)), _comparable(proposed.metadata.get(key))
+        if key == "draft":  # Hugo's default
+            a, b = bool(a), bool(b)
+        if a != b:
+            lines.append(f"  {key}:\n  - {a!r}\n  + {b!r}")
+    body = list(difflib.unified_diff(
+        live.content.strip().splitlines(), proposed.content.strip().splitlines(),
+        "live", "vault", n=1, lineterm="",
+    ))
+    if body:
+        lines.append("  body:")
+        lines.extend(f"    {line}" for line in body[2:])
+    return "\n".join(lines)
 
 
 def _fill_alt_text(post: frontmatter.Post, blog_dir: Path, vision_model: str, verbose: bool) -> None:

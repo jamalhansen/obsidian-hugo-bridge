@@ -116,7 +116,7 @@ class TestHandlePost:
         (live / "index.md").write_text("---\nslug: joins-explained\n---\nEdited in Hugo\n")
         with pytest.raises(OverwriteRefusedError) as err:
             handle_post(note, site, overwrite=False)
-        assert "-Edited in Hugo" in str(err.value)
+        assert "- Edited in Hugo" in str(err.value) or "-Edited in Hugo" in str(err.value)
         assert (live / "index.md").read_text().endswith("Edited in Hugo\n")
         assert not (live / "joins.jpg").exists()
 
@@ -206,3 +206,12 @@ class TestFinds:
         assert str(meta["date"]) == "2026-09-01"
         assert meta["tags"] == ["ai"]
         assert meta["source_type"] == "Mastodon Post"
+
+
+def test_formatting_only_differences_do_not_block(note, site):
+    bundle = handle_post(note, site)
+    index = bundle / "index.md"
+    post = frontmatter.load(index)
+    reformatted = frontmatter.dumps(post, sort_keys=True, default_flow_style=True)
+    index.write_text(reformatted)
+    handle_post(note, site, overwrite=False)
