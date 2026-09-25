@@ -10,38 +10,39 @@ uv tool install obsidian-hugo-bridge
 
 ## Usage
 
-The tool is available as `obsidian-hugo` after `uv sync`.
-
-### Publish a blog post
 ```bash
-uv run obsidian-hugo publish post input.md --hugo-dir ~/projects/jamalhansen.com
+obsidian-hugo publish post <note.md> --hugo-dir ~/projects/jamalhansen.com --vault-path ~/vaults/BrainSync
+obsidian-hugo publish find <find.md> --hugo-dir ~/projects/jamalhansen.com
+obsidian-hugo preview <note.md> --hugo-dir ~/projects/jamalhansen.com   # draft render in the real theme
+obsidian-hugo drift --hugo-dir ~/projects/jamalhansen.com               # vault vs live disagreements
 ```
 
-### Publish a "find" (bookmark)
-```bash
-uv run obsidian-hugo publish find input.md --hugo-dir ~/projects/jamalhansen.com
-```
+`--dry-run` previews without writing. `BLOG_PATH` / `OBSIDIAN_VAULT_PATH` can stand in for
+`--hugo-dir` / `--vault-path`. The blog repo wraps these as `make publish POST=...`,
+`make find FIND=...`, `make preview POST=...` and `make drift`.
 
-### Preview without writing
-```bash
-uv run obsidian-hugo publish post input.md --hugo-dir ~/projects/mysite --dry-run
-```
+## What publishing does
 
-## Configuration
+- **Status decides visibility.** `status: published` publishes live (`draft: false`); any other
+  status (`draft`, `outline`, ...) publishes as a Hugo draft.
+- **Placement comes from the note.** A post already on the site is overwritten in place, wherever
+  its bundle lives. A new post goes to `content/blog/<series-slug>/<NN>-<slug>/` (NN from
+  `series_position`) or `content/blog/<slug>/`; `#tsql2sday` posts go to `tsql-tuesday/`.
+- **Only Hugo fields reach Hugo.** Frontmatter is mapped to PaperMod (`summary` → `description`,
+  `toc` → `ShowToc`, `published_date` → `date`, `image`/`featureimage` + `alt` + `unsplash_*` →
+  `cover`); vault-only fields (`status`, `created`, `target_date`, the note-type `category`, ...)
+  are dropped. A cover without `alt:` uses the title so it's never unlabeled.
+- **Live edits are protected.** If the live `index.md` differs from what the note would produce
+  (cross-links, alt text or test annotations added in Hugo), publishing stops and prints the diff.
+  Backport the edits to the note, or pass `--overwrite`.
+- **The vault learns what's live.** After a live publish, missing `published_date` and
+  `canonical_url` are filled in on the note (line-level edit, backed up to
+  `~/.local/share/obsidian-hugo-bridge/backups/` first). `--no-write-back` skips it.
+- Images next to the note or referenced from the vault are copied into the bundle;
+  `--auto-alt` writes alt text with a local vision model; finds get oEmbed HTML for X/Bluesky.
 
-The tool respects the following environment variables:
-- `BLOG_PATH`: Path to the Hugo site root.
-- `OBSIDIAN_VAULT`: Path to the Obsidian vault root (used for image search).
-
-## Features
-
-- **Frontmatter normalization**: Converts Obsidian fields to PaperMod theme conventions (extensible).
-- **Body syntax conversion**: Handles Obsidian wikilinks (`![[image]]`), callouts, etc.
-- **Image copying**: Automatically copies referenced images from the source or the vault into the page bundle.
-- **Vision-powered Alt Tags**: Automatically generates descriptive alt text for images (including the cover image) using a local Ollama vision model (e.g., `llama3.2-vision`) when `--auto-alt` is used.
-- **oEmbed support**: Fetches pre-rendered embed HTML for X, Bluesky, and Mastodon links in "finds".
-- **LLM-generated descriptions**: (Optional) Generates meta descriptions if missing.
-- **Git integration**: Automatically adds and commits changes if `--commit` is used.
+`preview` writes the bundle to `content/blog/_preview/` (gitignore it), runs `hugo server -D`,
+opens the page, and deletes the bundle when the server stops.
 
 ## Tech Stack
 

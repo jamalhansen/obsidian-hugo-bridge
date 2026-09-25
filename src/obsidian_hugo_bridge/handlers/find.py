@@ -1,13 +1,27 @@
 import re
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import frontmatter
 import httpx
 from local_first_common.cli import resolve_provider
 
 from ..utils import slugify
+
+_EMBED_SOURCE_TYPE = {"x": "X Post", "bluesky": "Bluesky Post", "mastodon": "Mastodon Post"}
+
+
+def captured_date(value) -> str:
+    """`captured` as YYYY-MM-DD. YAML reads a bare date as a date object, not a string."""
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, str) and re.match(r"^\d{4}-\d{2}-\d{2}$", value.strip()):
+        return value.strip()
+    return datetime.now().astimezone().date().isoformat()
 
 
 def detect_social_platform(url: str) -> str | None:
@@ -27,9 +41,9 @@ def fetch_oembed_html(platform: str, url: str) -> str | None:
     clean_url = re.sub(r"\?.*$", "", url)
     try:
         if platform == "x":
-            api = f"https://publish.twitter.com/oembed?url={clean_url}&theme=dark&dnt=true&omit_script=false"
+            api = f"https://publish.twitter.com/oembed?url={quote(clean_url, safe='')}&theme=dark&dnt=true&omit_script=false"
         elif platform == "bluesky":
-            api = f"https://embed.bsky.app/oembed?url={url}"
+            api = f"https://embed.bsky.app/oembed?url={quote(url, safe='')}"
         else:
             return None
         
@@ -74,14 +88,7 @@ def handle_find(
     slug = post.metadata.get("slug") or slugify(source_title)
     slug = slugify(slug)
     
-    captured = post.metadata.get("captured")
-    if captured and isinstance(captured, (str, datetime)):
-        if isinstance(captured, datetime):
-            date = captured.strftime("%Y-%m-%d")
-        else:
-            date = captured
-    else:
-        date = datetime.now().astimezone().strftime("%Y-%m-%d")
+    published = captured_date(post.metadata.get("captured"))
         
     description = post.metadata.get("description")
     if not description:
@@ -108,14 +115,15 @@ def handle_find(
     # 2. Build Hugo Metadata
     hugo_meta: dict[str, Any] = {
         "title": source_title,
-        "date": date,
+        "date": published,
         "draft": False,
     }
     if description:
         hugo_meta["description"] = description
         
-    if "tags" in post.metadata:
-        hugo_meta["tags"] = post.metadata["tags"]
+    tags = [str(t).lstrip("#").strip() for t in post.metadata.get("tags") or [] if t]
+    if tags:
+        hugo_meta["tags"] = [t for t in tags if t]
         
     source_url = post.metadata.get("source_url")
     if source_url:
@@ -123,6 +131,7 @@ def handle_find(
         embed_type = detect_social_platform(source_url)
         if embed_type:
             hugo_meta["embed_type"] = embed_type
+            post.metadata.setdefault("source_type", _EMBED_SOURCE_TYPE[embed_type])
             if not dry_run:
                 if verbose:
                     print(f"🔗 Fetching {embed_type} oEmbed...")
@@ -142,8 +151,8 @@ def handle_find(
         find_dir.mkdir(parents=True, exist_ok=True)
         
     # 4. Save Output
-    new_post = frontmatter.Post(post.content, **hugo_meta)
-    final_output = frontmatter.dumps(new_post)
+    new_post = frontmatter.Post(post.content.lstrip(), **hugo_meta)
+    final_output = frontmatter.dumps(new_post, sort_keys=False) + "\n"
     
     if dry_run:
         print(f"[dry-run] Would write find to: {find_dir}/index.md")

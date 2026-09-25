@@ -26,6 +26,10 @@ class ConversionError(HugoBridgeError):
     """Raised when Obsidian-to-Hugo content conversion fails."""
 
 
+class OverwriteRefusedError(HugoBridgeError):
+    """Re-publishing would change a live bundle; the message is the unified diff."""
+
+
 def parse_obsidian_post(content: str) -> frontmatter.Post:
     """Parse Obsidian markdown content into a frontmatter.Post object."""
     post = frontmatter.loads(content)

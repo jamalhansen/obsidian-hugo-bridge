@@ -1,98 +1,97 @@
 from typing import Any
 
+# Output order, and the only keys that reach Hugo. Vault-only fields (status,
+# created, target_date, series_position, promo_file, the note-type `category`,
+# unsplash_*, ...) are consumed or dropped, never passed through.
+HUGO_KEYS = [
+    "title", "slug", "date", "lastmod", "publishDate", "expiryDate", "description",
+    "author", "tags", "categories", "series", "cover", "draft", "ShowToc", "TocOpen",
+    "weight", "aliases", "type", "keywords", "math", "url",
+]
+_CAPITALIZED = {
+    "Title": "title", "Series": "series", "Status": "status", "Author": "author",
+    "Tags": "tags", "Category": "category", "Created": "created", "Description": "description",
+}
+_COVER_IMAGE_KEYS = ("image", "featureimage", "featured_image")
+
+
+def _empty(value: Any) -> bool:
+    return value is None or value == "" or value == []
+
+
+def draft_from_status(metadata: dict[str, Any]) -> bool:
+    """status: published -> live; any other status (draft, outline, ...) -> draft.
+
+    With no status at all, an explicit `draft:` wins; otherwise default to draft.
+    """
+    status = str(metadata.get("status") or "").strip().lower()
+    if status:
+        return status != "published"
+    draft = metadata.get("draft")
+    return True if draft is None else bool(draft)
+
+
+def _cover(m: dict[str, Any], title: str | None) -> dict[str, Any] | None:
+    cover = dict(m["cover"]) if isinstance(m.get("cover"), dict) else {}
+    image = next((m[k] for k in _COVER_IMAGE_KEYS if not _empty(m.get(k))), None) or cover.get("image")
+    if not image:
+        return None
+    credit = {
+        out: m[src] for src, out in
+        (("unsplash_name", "name"), ("unsplash_user", "username"), ("unsplash_id", "photo_id"))
+        if not _empty(m.get(src))
+    }
+    cover["image"] = image
+    # A standalone `alt:` is how the vault records cover alt text; the title is the
+    # fallback so a cover is never announced as an unlabeled image.
+    cover["alt"] = m.get("alt") or cover.get("alt") or title or ""
+    cover.setdefault("caption", "")
+    cover.setdefault("relative", True)
+    if credit:
+        cover["credit"] = credit
+    return cover
+
+
+def _series(value: Any) -> list[str] | None:
+    if isinstance(value, str):
+        value = value.strip()
+        return [value] if value and value != "[]" else None
+    if isinstance(value, list):
+        items = [str(v).strip() for v in value if not _empty(v)]
+        return items or None
+    return None
+
 
 def normalize_papermod(metadata: dict[str, Any]) -> dict[str, Any]:
-    """Normalize frontmatter field names to PaperMod theme conventions."""
-    new_metadata = metadata.copy()
+    """Map vault frontmatter onto the fields PaperMod uses, in a stable order."""
+    m: dict[str, Any] = {}
+    for key, value in metadata.items():
+        key = _CAPITALIZED.get(key, key)
+        if key not in m or _empty(m[key]):
+            m[key] = value
 
-    # Change summary: to description:
-    if "summary" in new_metadata and "description" not in new_metadata:
-        new_metadata["description"] = new_metadata.pop("summary")
+    title = m.get("title")
+    out: dict[str, Any] = {k: m[k] for k in HUGO_KEYS if k in m and not _empty(m[k])}
 
-    # TOC handling
-    if "toc" in new_metadata:
-        toc_val = new_metadata.pop("toc")
-        if toc_val:
-            new_metadata["ShowToc"] = True
-            new_metadata["TocOpen"] = False
-        else:
-            new_metadata["ShowToc"] = False
+    if _empty(out.get("description")) and not _empty(m.get("summary")):
+        out["description"] = m["summary"]
+    if not _empty(m.get("published_date")):
+        out["date"] = m["published_date"]
+    if "toc" in m and "ShowToc" not in out:
+        out["ShowToc"] = bool(m["toc"])
+        out["TocOpen"] = False
+    if isinstance(out.get("tags"), list):
+        out["tags"] = [t.lstrip("#") for t in (str(t) for t in out["tags"] if not _empty(t)) if t.lstrip("#")]
+        if not out["tags"]:
+            del out["tags"]
+    series = _series(m.get("series"))
+    out.pop("series", None)
+    if series:
+        out["series"] = series
+    cover = _cover(m, title)
+    out.pop("cover", None)
+    if cover:
+        out["cover"] = cover
+    out["draft"] = draft_from_status(m)
 
-    # Process Unsplash credit and Cover images
-    unsplash_info = {}
-    for key in ["unsplash_name", "unsplash_user", "unsplash_id"]:
-        if key in new_metadata:
-            unsplash_info[key.replace("unsplash_", "")] = new_metadata.pop(key)
-
-    if "user" in unsplash_info:
-        unsplash_info["username"] = unsplash_info.pop("user")
-    if "id" in unsplash_info:
-        unsplash_info["photo_id"] = unsplash_info.pop("id")
-
-    # Cover image handling
-    if "image" in new_metadata:
-        img = new_metadata.pop("image")
-        if img:
-            cover = {
-                "image": img,
-                "alt": "",
-                "caption": "",
-                "relative": True,
-            }
-            if unsplash_info:
-                cover["credit"] = unsplash_info
-            new_metadata["cover"] = cover
-    elif unsplash_info:
-        if "cover" in new_metadata and isinstance(new_metadata["cover"], dict):
-            new_metadata["cover"]["credit"] = unsplash_info
-
-    # Convert published_date to date (Hugo field name)
-    if "published_date" in new_metadata and "date" not in new_metadata:
-        new_metadata["date"] = new_metadata.pop("published_date")
-    else:
-        new_metadata.pop("published_date", None)
-
-    # Strip tags: remove # prefix from each tag value
-    if "tags" in new_metadata and isinstance(new_metadata["tags"], list):
-        new_metadata["tags"] = [
-            t.lstrip("#") if isinstance(t, str) else t
-            for t in new_metadata["tags"]
-            if t  # drop empty/null entries
-        ]
-
-    # Normalize category: scalar or wikilink → list
-    if "category" in new_metadata:
-        cat = new_metadata["category"]
-        if isinstance(cat, str) and cat.strip():
-            new_metadata["category"] = [cat.strip()]
-        elif not cat:
-            new_metadata.pop("category")
-
-    # Clean up redundant or theme-clashing fields
-    # Note: slug is intentionally kept — Hugo uses it for URL overrides
-    to_strip = [
-        "canonical_url", "layout", "status", "created",
-        "Category", "promo_file", "series_position",
-        "featureimage", "cardimage",
-    ]
-    for field in to_strip:
-        new_metadata.pop(field, None)
-
-    # Strip null/empty-value fields (Obsidian leaves these as None)
-    new_metadata = {k: v for k, v in new_metadata.items() if v is not None and v != ""}
-
-    # Series handling
-    if "series" in new_metadata:
-        series = new_metadata["series"]
-        if isinstance(series, str):
-            if series.strip() in ("", "[]"):
-                new_metadata.pop("series")
-            else:
-                new_metadata["series"] = [series.strip()]
-        elif isinstance(series, list):
-            if not series:
-                new_metadata.pop("series")
-        else:
-            new_metadata.pop("series")
-
-    return new_metadata
+    return {k: out[k] for k in HUGO_KEYS if k in out}

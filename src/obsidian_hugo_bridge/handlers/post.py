@@ -1,3 +1,4 @@
+import difflib
 import re
 from datetime import datetime
 from pathlib import Path
@@ -5,11 +6,13 @@ from pathlib import Path
 import frontmatter
 
 from ..core import (
+    OverwriteRefusedError,
     convert_body_syntax,
     copy_images,
     generate_image_alt,
     parse_obsidian_post,
 )
+from ..site import PREVIEW_DIR, derived_bundle, existing_bundle
 from ..themes.papermod import normalize_papermod
 from ..utils import slugify
 
@@ -24,110 +27,72 @@ def handle_post(
     no_llm: bool = False,
     verbose: bool = False,
     auto_alt: bool = False,
-    vision_model: str = "@vision"
+    vision_model: str = "@vision",
+    preview: bool = False,
+    overwrite: bool = True,
 ) -> Path:
-    """Handle blog post conversion."""
+    """Convert a vault post into a Hugo page bundle and return the bundle directory.
+
+    Re-publishing overwrites the post's existing bundle wherever it lives. `preview`
+    writes a draft copy under content/blog/_preview/ instead (gitignored). With
+    `overwrite=False`, an existing bundle whose index.md would change is left alone and
+    OverwriteRefusedError carries the diff -- the live copy may hold edits the vault lacks.
+    """
     content = input_path.read_text(encoding="utf-8")
     post = parse_obsidian_post(content)
-    
-    # 1. Normalize slug
-    if not slug:
-        slug = post.metadata.get("slug") or post.metadata.get("title") or input_path.stem
-    
-    slug = slugify(slug)
-    
-    # 2. Frontmatter normalization
-    post.metadata = normalize_papermod(post.metadata)
-    
-    # Inject defaults if missing
-    if "title" not in post.metadata:
-        post.metadata["title"] = input_path.stem.replace("-", " ").title()
-    if "date" not in post.metadata:
-        post.metadata["date"] = datetime.now().astimezone().strftime("%Y-%m-%d")
-    if "author" not in post.metadata:
-        post.metadata["author"] = ["Jamal Hansen"]
-    if "draft" not in post.metadata:
-        post.metadata["draft"] = True
-        
-    # 3. Body syntax conversion
-    post.content = convert_body_syntax(post.content)
-    
-    # 4. Setup directory
-    # Tag-based subfolder routing for posts without a series
-    TAG_FOLDERS = {
-        "tsql2sday": "tsql-tuesday",
-    }
+    source = post.metadata
 
-    series = post.metadata.get("series")
-    if series:
-        series_name = series[0] if isinstance(series, list) else series
-        series_slug = slugify(series_name)
-        blog_dir = hugo_dir / "content" / "blog" / series_slug / slug
+    slug = slugify(slug or source.get("slug") or source.get("title") or input_path.stem)
+
+    post.metadata = normalize_papermod(source)
+    meta = post.metadata
+    meta.setdefault("title", input_path.stem.replace("-", " ").title())
+    meta["slug"] = slug
+    meta.setdefault("date", datetime.now().astimezone().date())
+    meta.setdefault("author", ["Jamal Hansen"])
+    if preview:
+        meta["draft"] = True
+    post.metadata = {"title": meta.pop("title"), "slug": meta.pop("slug"), **meta}
+
+    post.content = convert_body_syntax(post.content)
+
+    if preview:
+        blog_dir = hugo_dir / PREVIEW_DIR / slug
     else:
-        # Fall back to tag-based routing
-        tags = post.metadata.get("tags") or []
-        series_slug = next(
-            (TAG_FOLDERS[t.lower()] for t in tags if t.lower() in TAG_FOLDERS),
-            None,
+        blog_dir = existing_bundle(hugo_dir, slug) or derived_bundle(
+            hugo_dir, slug, post.metadata, source.get("series_position")
         )
-        if series_slug:
-            if verbose:
-                print(f"   📂 Routing via tag to subfolder: {series_slug}")
-            blog_dir = hugo_dir / "content" / "blog" / series_slug / slug
-        else:
-            blog_dir = hugo_dir / "content" / "blog" / slug
+    if verbose:
+        print(f"   📂 Bundle: {blog_dir.relative_to(hugo_dir)}")
+
+    index = blog_dir / "index.md"
+    if not overwrite and not preview and index.exists():
+        # Checked before anything is written, images included.
+        current = index.read_text(encoding="utf-8")
+        proposed = frontmatter.dumps(post, sort_keys=False) + "\n"
+        if current != proposed:
+            raise OverwriteRefusedError("".join(difflib.unified_diff(
+                current.splitlines(keepends=True), proposed.splitlines(keepends=True),
+                fromfile=f"live/{index.relative_to(hugo_dir)}", tofile=f"vault/{input_path.name}",
+            )))
 
     if not dry_run:
         blog_dir.mkdir(parents=True, exist_ok=True)
-        
-    # 5. Image handling (copy first so we can run vision on them)
-    if not dry_run:
         copy_images(
             post.content,
             input_path.parent,
             blog_dir,
             vault_path=vault_path,
             attachment_folders=attachment_folders,
-            verbose=verbose
+            verbose=verbose,
         )
     else:
         print(f"[dry-run] Would copy images to: {blog_dir}")
 
-    # 6. Auto-alt generation
     if auto_alt and not no_llm:
-        # Cover image alt
-        cover = post.metadata.get("cover")
-        if isinstance(cover, dict) and cover.get("image"):
-            image_path = blog_dir / cover["image"]
-            if not cover.get("alt"):
-                alt = generate_image_alt(image_path, model=vision_model, verbose=verbose)
-                if alt:
-                    cover["alt"] = alt
-                    if verbose:
-                        print(f"   ✓ Generated alt for cover: {alt}")
+        _fill_alt_text(post, blog_dir, vision_model, verbose)
 
-        # Inline images alt
-        # Find all ![alt](path)
-        img_pattern = r"!\[(.*?)\]\((.*?)\)"
-        matches = re.findall(img_pattern, post.content)
-        for old_alt, img_path_str in matches:
-            if not old_alt.strip() or old_alt.strip().lower() in ("image", "img"):
-                # Potential candidate for auto-alt
-                # Resolve path relative to blog_dir
-                actual_path = blog_dir / img_path_str
-                if actual_path.exists():
-                    new_alt = generate_image_alt(actual_path, model=vision_model, verbose=verbose)
-                    if new_alt:
-                        # Replace in content (simple string replace might be risky if same path is used twice, 
-                        # but standard markdown uses unique-ish paths usually)
-                        old_md = f"![{old_alt}]({img_path_str})"
-                        new_md = f"![{new_alt}]({img_path_str})"
-                        post.content = post.content.replace(old_md, new_md)
-                        if verbose:
-                            print(f"   ✓ Generated alt for {img_path_str}: {new_alt}")
-
-    # 7. Save output
-    final_output = frontmatter.dumps(post)
+    final_output = frontmatter.dumps(post, sort_keys=False) + "\n"
     if dry_run:
         print(f"[dry-run] Would write post to: {blog_dir}/index.md")
         if verbose:
@@ -135,8 +100,34 @@ def handle_post(
             print(final_output[:500] + "...")
             print("-" * 20)
     else:
-        (blog_dir / "index.md").write_text(final_output, encoding="utf-8")
+        index.write_text(final_output, encoding="utf-8")
         if verbose:
             print(f"   ✓ Written: {blog_dir}/index.md")
-            
+
     return blog_dir
+
+
+def _fill_alt_text(post: frontmatter.Post, blog_dir: Path, vision_model: str, verbose: bool) -> None:
+    """Replace missing, generic or title-fallback alt text with a vision-model description."""
+    cover = post.metadata.get("cover")
+    needs_alt = isinstance(cover, dict) and cover.get("image") and (
+        not cover.get("alt") or cover.get("alt") == post.metadata.get("title")
+    )
+    if needs_alt:
+        alt = generate_image_alt(blog_dir / cover["image"], model=vision_model, verbose=verbose)
+        if alt:
+            cover["alt"] = alt
+            if verbose:
+                print(f"   ✓ Generated alt for cover: {alt}")
+
+    for old_alt, img_path_str in re.findall(r"!\[(.*?)\]\((.*?)\)", post.content):
+        if old_alt.strip() and old_alt.strip().lower() not in ("image", "img"):
+            continue
+        actual_path = blog_dir / img_path_str
+        if not actual_path.exists():
+            continue
+        new_alt = generate_image_alt(actual_path, model=vision_model, verbose=verbose)
+        if new_alt:
+            post.content = post.content.replace(f"![{old_alt}]({img_path_str})", f"![{new_alt}]({img_path_str})")
+            if verbose:
+                print(f"   ✓ Generated alt for {img_path_str}: {new_alt}")
