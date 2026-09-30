@@ -89,9 +89,9 @@ Most recent first.
 
 ## Known Issues / Next Steps
 
-- [ ] Verify dry-run output matches `scripts/obsidian-to-hugo.py` on a real post before switching over
-- [ ] `scripts/obsidian-to-hugo.py` converts `published_date:` → `date:` — verify bridge handles this (papermod.py strips `published_date` without converting it; may need fix)
-- [ ] Add `target_date`, `post`, `series_position` to `to_strip` (already present; verify they are not in use)
+- [x] Verify dry-run output matches `scripts/obsidian-to-hugo.py` on a real post before switching over — moot (2026-09-29): the switch happened; the old script no longer exists and the bridge is the live publisher
+- [x] `scripts/obsidian-to-hugo.py` converts `published_date:` → `date:` — verify bridge handles this — done: `themes/papermod.py` maps `published_date` to `date`
+- [x] Add `target_date`, `post`, `series_position` to `to_strip` — superseded: papermod.py now passes only an allow-list (`HUGO_KEYS`), so vault-only fields can't reach Hugo
 - [ ] Batch mode (`--dir`) not yet implemented
 
 ---
