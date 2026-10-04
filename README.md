@@ -4,9 +4,17 @@ A standalone CLI tool that converts Obsidian markdown to Hugo-compatible page bu
 
 ## Installation
 
+Install from this checkout, on every machine that commits to the blog:
+
 ```bash
-uv tool install obsidian-hugo-bridge
+uv tool install --force ~/projects/local-first/obsidian-hugo-bridge
 ```
+
+The blog's pre-commit hook runs `obsidian-hugo check`, so the installed command
+has to track this repo. After pulling changes here, run the same command again.
+Don't patch an installed copy: fix it here and reinstall. (2026-10-04: a
+`check` adjustment made on the MacBook never reached this repo; the installed
+copy there was probably stale.)
 
 ## Usage
 
