@@ -5,6 +5,7 @@ is never overwritten. Edits are line-level inside the frontmatter block, so the 
 of the note (key order, quoting, comments, body) stays byte-for-byte the same. The
 note is copied to a timestamped backup before it's changed.
 """
+
 import re
 import shutil
 from datetime import datetime

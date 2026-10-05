@@ -4,6 +4,7 @@ Edits made directly in Hugo after publishing (alt text, a retitle, test annotati
 leave the vault stale; re-publishing from the vault would then undo them. This lists
 those differences so they can be backported before the vault is treated as truth.
 """
+
 import re
 from dataclasses import dataclass, field
 from datetime import date

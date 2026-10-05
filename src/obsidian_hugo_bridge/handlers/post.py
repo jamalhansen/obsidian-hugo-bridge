@@ -125,10 +125,16 @@ def semantic_diff(live: frontmatter.Post, proposed: frontmatter.Post) -> str:
             a, b = bool(a), bool(b)
         if a != b:
             lines.append(f"  {key}:\n  - {a!r}\n  + {b!r}")
-    body = list(difflib.unified_diff(
-        live.content.strip().splitlines(), proposed.content.strip().splitlines(),
-        "live", "vault", n=1, lineterm="",
-    ))
+    body = list(
+        difflib.unified_diff(
+            live.content.strip().splitlines(),
+            proposed.content.strip().splitlines(),
+            "live",
+            "vault",
+            n=1,
+            lineterm="",
+        )
+    )
     if body:
         lines.append("  body:")
         lines.extend(f"    {line}" for line in body[2:])
@@ -138,8 +144,10 @@ def semantic_diff(live: frontmatter.Post, proposed: frontmatter.Post) -> str:
 def _fill_alt_text(post: frontmatter.Post, blog_dir: Path, vision_model: str, verbose: bool) -> None:
     """Replace missing, generic or title-fallback alt text with a vision-model description."""
     cover = post.metadata.get("cover")
-    needs_alt = isinstance(cover, dict) and cover.get("image") and (
-        not cover.get("alt") or cover.get("alt") == post.metadata.get("title")
+    needs_alt = (
+        isinstance(cover, dict)
+        and cover.get("image")
+        and (not cover.get("alt") or cover.get("alt") == post.metadata.get("title"))
     )
     if needs_alt:
         alt = generate_image_alt(blog_dir / cover["image"], model=vision_model, verbose=verbose)

@@ -1,4 +1,5 @@
 """Facts about the target Hugo site: where a post's bundle lives, and its public URL."""
+
 from pathlib import Path
 
 import frontmatter
@@ -47,8 +48,10 @@ def derived_bundle(hugo_dir: Path, slug: str, metadata: dict, series_position=No
     """Where a new post goes: blog/<series-slug>/<NN>-<slug>/, or blog/<slug>/ outside a series."""
     blog = hugo_dir / "content" / "blog"
     series = metadata.get("series")
-    folder = slugify(series[0]) if series else next(
-        (TAG_FOLDERS[t.lower()] for t in metadata.get("tags") or [] if t.lower() in TAG_FOLDERS), None
+    folder = (
+        slugify(series[0])
+        if series
+        else next((TAG_FOLDERS[t.lower()] for t in metadata.get("tags") or [] if t.lower() in TAG_FOLDERS), None)
     )
     name = slug
     if series and isinstance(series_position, int) and not isinstance(series_position, bool):

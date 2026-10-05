@@ -4,13 +4,37 @@ from typing import Any
 # created, target_date, series_position, promo_file, the note-type `category`,
 # unsplash_*, ...) are consumed or dropped, never passed through.
 HUGO_KEYS = [
-    "title", "slug", "date", "lastmod", "publishDate", "expiryDate", "description",
-    "author", "tags", "categories", "series", "cover", "draft", "ShowToc", "TocOpen",
-    "weight", "aliases", "type", "keywords", "math", "url",
+    "title",
+    "slug",
+    "date",
+    "lastmod",
+    "publishDate",
+    "expiryDate",
+    "description",
+    "author",
+    "tags",
+    "categories",
+    "series",
+    "cover",
+    "draft",
+    "ShowToc",
+    "TocOpen",
+    "weight",
+    "aliases",
+    "type",
+    "keywords",
+    "math",
+    "url",
 ]
 _CAPITALIZED = {
-    "Title": "title", "Series": "series", "Status": "status", "Author": "author",
-    "Tags": "tags", "Category": "category", "Created": "created", "Description": "description",
+    "Title": "title",
+    "Series": "series",
+    "Status": "status",
+    "Author": "author",
+    "Tags": "tags",
+    "Category": "category",
+    "Created": "created",
+    "Description": "description",
 }
 _COVER_IMAGE_KEYS = ("image", "featureimage", "featured_image")
 
@@ -37,8 +61,8 @@ def _cover(m: dict[str, Any], title: str | None) -> dict[str, Any] | None:
     if not image:
         return None
     credit = {
-        out: m[src] for src, out in
-        (("unsplash_name", "name"), ("unsplash_user", "username"), ("unsplash_id", "photo_id"))
+        out: m[src]
+        for src, out in (("unsplash_name", "name"), ("unsplash_user", "username"), ("unsplash_id", "photo_id"))
         if not _empty(m.get(src))
     }
     cover["image"] = image

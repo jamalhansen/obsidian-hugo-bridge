@@ -73,10 +73,13 @@ def _record_publish(note: Path, hugo_dir: Path, bundle: Path) -> None:
         print("   ℹ️  Published as a draft (vault status isn't 'published'); vault note left as is.")
         return
     published = meta.get("date")
-    written = write_back(note, {
-        "published_date": published.isoformat() if isinstance(published, date) else str(published),
-        "canonical_url": canonical_url(hugo_dir, str(meta["slug"])),
-    })
+    written = write_back(
+        note,
+        {
+            "published_date": published.isoformat() if isinstance(published, date) else str(published),
+            "canonical_url": canonical_url(hugo_dir, str(meta["slug"])),
+        },
+    )
     if written:
         print(f"   ✓ Recorded on vault note: {', '.join(f'{k}={v}' for k, v in written.items())}")
 
@@ -181,8 +184,11 @@ def preview(
     """
     hugo = _hugo_dir(hugo_dir)
     target_dir = handle_post(
-        input_file, hugo, vault_path=_vault(vault_path),
-        attachment_folders=attachment_folder or ["attachments", "images"], preview=True,
+        input_file,
+        hugo,
+        vault_path=_vault(vault_path),
+        attachment_folders=attachment_folder or ["attachments", "images"],
+        preview=True,
     )
     slug = frontmatter.load(target_dir / "index.md").metadata["slug"]
     url = f"http://localhost:{port}{urlparse(canonical_url(hugo, slug)).path}"
@@ -214,12 +220,23 @@ def drift(
     hugo = _hugo_dir(hugo_dir)
     results = [drift_for(n, hugo) for n in published_notes(vault_blog)]
     if as_json:
-        typer.echo(json.dumps([
-            {"note": str(d.note), "slug": d.slug, "live": str(d.live) if d.live else None,
-             "fields": {k: {"vault": v, "live": lv} for k, (v, lv) in d.fields.items()},
-             "body_differs": d.body_differs}
-            for d in results if not d.clean
-        ], indent=2, default=str))
+        typer.echo(
+            json.dumps(
+                [
+                    {
+                        "note": str(d.note),
+                        "slug": d.slug,
+                        "live": str(d.live) if d.live else None,
+                        "fields": {k: {"vault": v, "live": lv} for k, (v, lv) in d.fields.items()},
+                        "body_differs": d.body_differs,
+                    }
+                    for d in results
+                    if not d.clean
+                ],
+                indent=2,
+                default=str,
+            )
+        )
         return
     for d in results:
         if d.clean:

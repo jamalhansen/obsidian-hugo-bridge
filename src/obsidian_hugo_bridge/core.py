@@ -38,9 +38,7 @@ def parse_obsidian_post(content: str) -> frontmatter.Post:
         if isinstance(value, str):
             post.metadata[key] = clean_wikilinks(value)
         elif isinstance(value, list):
-            post.metadata[key] = [
-                clean_wikilinks(v) if isinstance(v, str) else v for v in value
-            ]
+            post.metadata[key] = [clean_wikilinks(v) if isinstance(v, str) else v for v in value]
     return post
 
 
@@ -61,9 +59,7 @@ def convert_body_syntax(body: str) -> str:
     return body
 
 
-def generate_image_alt(
-    image_path: Path, model: str = "@vision", verbose: bool = False
-) -> str | None:
+def generate_image_alt(image_path: Path, model: str = "@vision", verbose: bool = False) -> str | None:
     """Generate an alt tag for an image using a vision model."""
     if not image_path.exists():
         if verbose:
@@ -157,17 +153,13 @@ def copy_images(
                             copied.append(img_name)
                             found = True
                             if verbose:
-                                print(
-                                    f"   ✓ Copied from attachment folder ({folder}): {img_name}"
-                                )
+                                print(f"   ✓ Copied from attachment folder ({folder}): {img_name}")
                             break
 
                 # Fallback to full vault search if not found
                 if not found:
                     if verbose:
-                        print(
-                            f"   🔍 Image not in priority folders, searching full vault: {img_name}"
-                        )
+                        print(f"   🔍 Image not in priority folders, searching full vault: {img_name}")
                     matches = list(vault_path.rglob(img_name))
                     if matches:
                         shutil.copy2(matches[0], dest)

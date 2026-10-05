@@ -13,6 +13,7 @@ def slugify(text: str) -> str:
     text = re.sub(r"[^\w\s-]", "", text).strip().lower()
     return re.sub(r"[-\s]+", "-", text)
 
+
 def clean_wikilinks(text: str) -> str:
     """
     Remove Obsidian wiki-link syntax [[...]] from string.
@@ -23,6 +24,7 @@ def clean_wikilinks(text: str) -> str:
     # Group 1: Link, Group 2: Alias (optional)
     return re.sub(r"\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]", lambda m: m.group(2) or m.group(1), text)
 
+
 def yaml_str(value: str) -> str:
     """Escape a value for embedding in a YAML double-quoted string."""
-    return str(value).replace("\\", "\\\\").replace("\"", "\\\"")
+    return str(value).replace("\\", "\\\\").replace('"', '\\"')

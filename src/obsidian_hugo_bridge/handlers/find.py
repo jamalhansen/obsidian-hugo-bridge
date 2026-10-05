@@ -36,6 +36,7 @@ def detect_social_platform(url: str) -> str | None:
         return "mastodon"
     return None
 
+
 def fetch_oembed_html(platform: str, url: str) -> str | None:
     """Fetch pre-rendered embed HTML from the platform's oEmbed API."""
     clean_url = re.sub(r"\?.*$", "", url)
@@ -46,7 +47,7 @@ def fetch_oembed_html(platform: str, url: str) -> str | None:
             api = f"https://embed.bsky.app/oembed?url={quote(url, safe='')}"
         else:
             return None
-        
+
         with httpx.Client() as client:
             resp = client.get(api, timeout=10.0)
             if resp.status_code == 200:
@@ -55,6 +56,7 @@ def fetch_oembed_html(platform: str, url: str) -> str | None:
     except Exception as e:  # noqa: BLE001 - oEmbed is a nice-to-have preview; any fetch failure should skip it, not crash the publish
         print(f"⚠️  oEmbed fetch failed for {platform}: {e}")
     return None
+
 
 def extract_description_from_body(body: str, max_len: int = 160) -> str:
     """Pull the first meaningful paragraph from commentary for meta description."""
@@ -67,29 +69,26 @@ def extract_description_from_body(body: str, max_len: int = 160) -> str:
         return first_para
     return first_para[:max_len].rsplit(" ", 1)[0] + "..."
 
+
 def handle_find(
-    input_path: Path,
-    hugo_dir: Path,
-    dry_run: bool = False,
-    no_llm: bool = False,
-    verbose: bool = False
+    input_path: Path, hugo_dir: Path, dry_run: bool = False, no_llm: bool = False, verbose: bool = False
 ) -> Path:
     """Handle finds conversion."""
     content = input_path.read_text(encoding="utf-8")
     post = frontmatter.loads(content)
-    
+
     # 1. Extraction and Defaults
     source_title = post.metadata.get("source_title")
     if not source_title:
         # Derive from filename: strip leading "0001-" style prefix
         stem = re.sub(r"^\d+-", "", input_path.stem)
         source_title = stem.replace("-", " ").title()
-        
+
     slug = post.metadata.get("slug") or slugify(source_title)
     slug = slugify(slug)
-    
+
     published = captured_date(post.metadata.get("captured"))
-        
+
     description = post.metadata.get("description")
     if not description:
         if no_llm:
@@ -101,7 +100,7 @@ def handle_find(
                 llm = resolve_provider(no_llm=no_llm, tool_name="obsidian-hugo-bridge")
                 system = "You are a helpful assistant that writes concise meta descriptions for blog posts."
                 user = f"Write a 1-sentence meta description (max 160 chars) for this blog post snippet:\n\n{post.content[:1000]}"
-                
+
                 llm.source_location = str(input_path)
                 llm.item_count = 1
                 result = llm.complete(system, user)
@@ -111,7 +110,7 @@ def handle_find(
                 if verbose:
                     print(f"⚠️  LLM description generation failed: {e}")
                 description = extract_description_from_body(post.content)
-    
+
     # 2. Build Hugo Metadata
     hugo_meta: dict[str, Any] = {
         "title": source_title,
@@ -120,11 +119,11 @@ def handle_find(
     }
     if description:
         hugo_meta["description"] = description
-        
+
     tags = [str(t).lstrip("#").strip() for t in post.metadata.get("tags") or [] if t]
     if tags:
         hugo_meta["tags"] = [t for t in tags if t]
-        
+
     source_url = post.metadata.get("source_url")
     if source_url:
         hugo_meta["source_url"] = source_url
@@ -140,20 +139,20 @@ def handle_find(
                     hugo_meta["embed_html"] = embed_html
             else:
                 hugo_meta["embed_html"] = "[LLM MOCK EMBED]"
-                
+
     for field in ["source_title", "source_author", "source_type"]:
         if field in post.metadata:
             hugo_meta[field] = post.metadata[field]
-            
+
     # 3. Setup Directory
     find_dir = hugo_dir / "content" / "finds" / slug
     if not dry_run:
         find_dir.mkdir(parents=True, exist_ok=True)
-        
+
     # 4. Save Output
     new_post = frontmatter.Post(post.content.lstrip(), **hugo_meta)
     final_output = frontmatter.dumps(new_post, sort_keys=False) + "\n"
-    
+
     if dry_run:
         print(f"[dry-run] Would write find to: {find_dir}/index.md")
         if verbose:
@@ -164,5 +163,5 @@ def handle_find(
         (find_dir / "index.md").write_text(final_output, encoding="utf-8")
         if verbose:
             print(f"   ✓ Written: {find_dir}/index.md")
-            
+
     return find_dir

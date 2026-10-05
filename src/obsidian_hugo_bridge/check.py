@@ -4,6 +4,7 @@ The bridge writes valid frontmatter; these catch what happens afterwards in Hugo
 a block indented under the wrong key, a missing description, an empty tag, a cover
 with no alt text. Errors fail; warnings are reported (e.g. vault-only leftovers).
 """
+
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -16,7 +17,16 @@ from .themes.papermod import HUGO_KEYS
 
 _DATE_KEYS = ("date", "publishDate", "pubdate", "published")
 # Extra keys Hugo or the site's own layouts read (date aliases, finds) -- not leftovers.
-_SITE_KEYS = {"published", "pubdate", "source_url", "source_title", "source_author", "source_type", "embed_type", "embed_html"}
+_SITE_KEYS = {
+    "published",
+    "pubdate",
+    "source_url",
+    "source_title",
+    "source_author",
+    "source_type",
+    "embed_type",
+    "embed_html",
+}
 
 
 @dataclass

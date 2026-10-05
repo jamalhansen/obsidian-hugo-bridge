@@ -26,10 +26,7 @@ def test_slugify():
 
 def test_clean_wikilinks():
     assert clean_wikilinks("[[Link]]") == "Link"
-    assert (
-        clean_wikilinks("Text with [[Link]] and [[Another]]")
-        == "Text with Link and Another"
-    )
+    assert clean_wikilinks("Text with [[Link]] and [[Another]]") == "Text with Link and Another"
     assert clean_wikilinks("[[Link|Alias]]") == "Alias"
     assert clean_wikilinks("[[Link#Header]]") == "Link"
     assert clean_wikilinks("[[Link#Header|Alias]]") == "Alias"

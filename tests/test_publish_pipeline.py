@@ -71,14 +71,28 @@ class TestNormalize:
 
     def test_vault_only_fields_never_reach_hugo(self):
         out = normalize_papermod(frontmatter.loads(VAULT_NOTE).metadata)
-        for key in ("status", "category", "created", "target_date", "series_position",
-                    "featureimage", "unsplash_name", "canonical_url", "published_date"):
+        for key in (
+            "status",
+            "category",
+            "created",
+            "target_date",
+            "series_position",
+            "featureimage",
+            "unsplash_name",
+            "canonical_url",
+            "published_date",
+        ):
             assert key not in out
 
     def test_cover_from_featureimage_with_title_alt_and_credit(self):
         out = normalize_papermod({"title": "T", "featureimage": "a.jpg", "unsplash_user": "u"})
-        assert out["cover"] == {"image": "a.jpg", "alt": "T", "caption": "", "relative": True,
-                                "credit": {"username": "u"}}
+        assert out["cover"] == {
+            "image": "a.jpg",
+            "alt": "T",
+            "caption": "",
+            "relative": True,
+            "credit": {"username": "u"},
+        }
 
     def test_standalone_alt_wins(self):
         assert normalize_papermod({"title": "T", "image": "a.jpg", "alt": "A cat"})["cover"]["alt"] == "A cat"
@@ -137,8 +151,11 @@ class TestHandlePost:
 class TestWriteBack:
     def test_fills_missing_and_empty_fields_only(self, note, tmp_path):
         before = note.read_text()
-        written = write_back(note, {"canonical_url": "https://example.com/blog/joins-explained/",
-                                    "published_date": "2099-01-01"}, backup_dir=tmp_path / "bk")
+        written = write_back(
+            note,
+            {"canonical_url": "https://example.com/blog/joins-explained/", "published_date": "2099-01-01"},
+            backup_dir=tmp_path / "bk",
+        )
         assert written == {"canonical_url": "https://example.com/blog/joins-explained/"}
         after = note.read_text()
         assert "canonical_url: https://example.com/blog/joins-explained/\n" in after
@@ -202,8 +219,10 @@ class TestFinds:
     def test_find_fields(self, tmp_path, site):
         (site / "content" / "finds").mkdir()
         f = tmp_path / "0001-a-find.md"
-        f.write_text("---\nsource_title: A Find\nsource_url: https://example.com/@me/123\n"
-                     "captured: 2026-09-01\ntags: ['#ai']\n---\n\nWorth reading.\n")
+        f.write_text(
+            "---\nsource_title: A Find\nsource_url: https://example.com/@me/123\n"
+            "captured: 2026-09-01\ntags: ['#ai']\n---\n\nWorth reading.\n"
+        )
         bundle = handle_find(f, site, no_llm=True)
         meta = frontmatter.load(bundle / "index.md").metadata
         assert str(meta["date"]) == "2026-09-01"
@@ -230,15 +249,23 @@ class TestCheck:
     def test_clean_post_passes(self, site):
         from obsidian_hugo_bridge.check import check_post
 
-        p = self._post(site, "ok", "title: T\ndate: 2026-01-01\ndescription: D\ntags: [a]\n"
-                                   "series: [S]\ncover:\n  image: a.jpg\n  alt: A thing\n")
+        p = self._post(
+            site,
+            "ok",
+            "title: T\ndate: 2026-01-01\ndescription: D\ntags: [a]\n"
+            "series: [S]\ncover:\n  image: a.jpg\n  alt: A thing\n",
+        )
         assert check_post(p).errors == []
 
     def test_the_bugs_hand_edits_introduce(self, site):
         from obsidian_hugo_bridge.check import check_post
 
-        p = self._post(site, "bad", "title: T\npublished: 2026-01-01\ntags:\n  - a\n  -\n"
-                                    "series:\n  - cover: x\ncategories: Solo\ncover:\n  image: a.jpg\n  alt: ''\n")
+        p = self._post(
+            site,
+            "bad",
+            "title: T\npublished: 2026-01-01\ntags:\n  - a\n  -\n"
+            "series:\n  - cover: x\ncategories: Solo\ncover:\n  image: a.jpg\n  alt: ''\n",
+        )
         errors = check_post(p).errors
         assert "missing date" not in errors  # `published` is a Hugo date alias
         assert "missing description" in errors

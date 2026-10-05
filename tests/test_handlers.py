@@ -15,11 +15,13 @@ def mock_hugo_dir(tmp_path):
     (hugo_dir / "content" / "finds").mkdir()
     return hugo_dir
 
+
 @pytest.fixture
 def mock_input_file(tmp_path):
     input_file = tmp_path / "post.md"
     input_file.write_text("---\ntitle: Test Post\n---\n# Body content", encoding="utf-8")
     return input_file
+
 
 def test_handle_post_basic(mock_input_file, mock_hugo_dir):
     target_dir = handle_post(mock_input_file, mock_hugo_dir, dry_run=False)
@@ -27,10 +29,13 @@ def test_handle_post_basic(mock_input_file, mock_hugo_dir):
     assert (target_dir / "index.md").exists()
     assert "Test Post" in (target_dir / "index.md").read_text()
 
+
 def test_handle_find_basic(tmp_path, mock_hugo_dir):
     input_file = tmp_path / "find.md"
-    input_file.write_text("---\nsource_title: Great Resource\nsource_url: https://example.com\n---\nCommentary", encoding="utf-8")
-    
+    input_file.write_text(
+        "---\nsource_title: Great Resource\nsource_url: https://example.com\n---\nCommentary", encoding="utf-8"
+    )
+
     target_dir = handle_find(input_file, mock_hugo_dir, dry_run=False, no_llm=True)
     assert target_dir.exists()
     assert (target_dir / "index.md").exists()
@@ -38,10 +43,11 @@ def test_handle_find_basic(tmp_path, mock_hugo_dir):
     assert "Great Resource" in content
     assert "source_url: https://example.com" in content
 
+
 def test_handle_post_auto_alt(mock_input_file, mock_hugo_dir):
     # Setup cover image in input
     mock_input_file.write_text("---\ntitle: Post\nimage: cover.jpg\n---\n![](img.png)", encoding="utf-8")
-    
+
     # Create fake image files in a fake blog dir
     target_blog_dir = mock_hugo_dir / "content" / "blog" / "post"
     target_blog_dir.mkdir(parents=True, exist_ok=True)
@@ -50,17 +56,13 @@ def test_handle_post_auto_alt(mock_input_file, mock_hugo_dir):
 
     with patch("obsidian_hugo_bridge.handlers.post.generate_image_alt") as mock_gen:
         mock_gen.return_value = "A generated description"
-        
-        target_dir = handle_post(
-            mock_input_file, 
-            mock_hugo_dir, 
-            dry_run=False, 
-            auto_alt=True
-        )
-        
+
+        target_dir = handle_post(mock_input_file, mock_hugo_dir, dry_run=False, auto_alt=True)
+
         content = (target_dir / "index.md").read_text()
         assert "alt: A generated description" in content
         assert "![A generated description](img.png)" in content
+
 
 def test_handle_post_attachment_folders(tmp_path, mock_hugo_dir):
     # Setup mock vault
@@ -69,51 +71,54 @@ def test_handle_post_attachment_folders(tmp_path, mock_hugo_dir):
     attach_dir = vault_dir / "attachments"
     attach_dir.mkdir()
     (attach_dir / "vault_img.png").write_text("fake image content")
-    
+
     input_file = tmp_path / "post.md"
-    input_file.write_text("---\ntitle: Post with Vault Image\n---\nHere is an image: ![vault_img.png](vault_img.png)", encoding="utf-8")
-    
-    target_dir = handle_post(
-        input_file,
-        mock_hugo_dir,
-        vault_path=vault_dir,
-        attachment_folders=["attachments"],
-        dry_run=False
+    input_file.write_text(
+        "---\ntitle: Post with Vault Image\n---\nHere is an image: ![vault_img.png](vault_img.png)", encoding="utf-8"
     )
-    
+
+    target_dir = handle_post(
+        input_file, mock_hugo_dir, vault_path=vault_dir, attachment_folders=["attachments"], dry_run=False
+    )
+
     assert (target_dir / "vault_img.png").exists()
     assert (target_dir / "vault_img.png").read_text() == "fake image content"
+
 
 def test_handle_post_series_and_slug(tmp_path, mock_hugo_dir):
     input_file = tmp_path / "post_with_series.md"
     input_file.write_text("---\ntitle: My Post\nseries: Local-First AI\nslug: custom-slug\n---\nBody", encoding="utf-8")
-    
+
     target_dir = handle_post(input_file, mock_hugo_dir, dry_run=False)
-    
+
     # Expected path: content/blog/local-first-ai/custom-slug
     expected_path = mock_hugo_dir / "content" / "blog" / "local-first-ai" / "custom-slug"
     assert target_dir == expected_path
     assert target_dir.exists()
     assert (target_dir / "index.md").exists()
-    
+
+
 def test_handle_post_series_list(tmp_path, mock_hugo_dir):
     input_file = tmp_path / "post_with_series_list.md"
     # Using a list for series (common in some frontmatter setups)
-    input_file.write_text("---\ntitle: My Post\nseries: [\"Local-First AI\", \"Another Series\"]\n---\nBody", encoding="utf-8")
-    
+    input_file.write_text(
+        '---\ntitle: My Post\nseries: ["Local-First AI", "Another Series"]\n---\nBody', encoding="utf-8"
+    )
+
     target_dir = handle_post(input_file, mock_hugo_dir, dry_run=False)
-    
+
     # Expected path: content/blog/local-first-ai/my-post
     expected_path = mock_hugo_dir / "content" / "blog" / "local-first-ai" / "my-post"
     assert target_dir == expected_path
     assert target_dir.exists()
 
+
 def test_handle_find_custom_slug(tmp_path, mock_hugo_dir):
     input_file = tmp_path / "find_with_slug.md"
     input_file.write_text("---\nsource_title: Great Resource\nslug: my-custom-find\n---\nCommentary", encoding="utf-8")
-    
+
     target_dir = handle_find(input_file, mock_hugo_dir, dry_run=False, no_llm=True)
-    
+
     # Expected path: content/finds/my-custom-find
     expected_path = mock_hugo_dir / "content" / "finds" / "my-custom-find"
     assert target_dir == expected_path
