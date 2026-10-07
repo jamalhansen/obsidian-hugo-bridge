@@ -42,7 +42,7 @@ def handle_post(
     post = parse_obsidian_post(content)
     source = post.metadata
 
-    slug = slugify(slug or source.get("slug") or source.get("title") or input_path.stem)
+    slug = slugify(str(slug or source.get("slug") or source.get("title") or input_path.stem))
 
     post.metadata = normalize_papermod(source)
     meta = post.metadata
@@ -149,7 +149,7 @@ def _fill_alt_text(post: frontmatter.Post, blog_dir: Path, vision_model: str, ve
         and cover.get("image")
         and (not cover.get("alt") or cover.get("alt") == post.metadata.get("title"))
     )
-    if needs_alt:
+    if needs_alt and isinstance(cover, dict):
         alt = generate_image_alt(blog_dir / cover["image"], model=vision_model, verbose=verbose)
         if alt:
             cover["alt"] = alt

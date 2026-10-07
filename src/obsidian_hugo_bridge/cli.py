@@ -190,7 +190,7 @@ def preview(
         attachment_folders=attachment_folder or ["attachments", "images"],
         preview=True,
     )
-    slug = frontmatter.load(target_dir / "index.md").metadata["slug"]
+    slug = str(frontmatter.load(target_dir / "index.md").metadata["slug"])
     url = f"http://localhost:{port}{urlparse(canonical_url(hugo, slug)).path}"
     if not serve:
         print(f"Preview bundle written to {target_dir}")

@@ -32,7 +32,10 @@ def missing_fields(note_text: str, updates: dict[str, str]) -> dict[str, str]:
 
 def apply_updates(note_text: str, updates: dict[str, str]) -> str:
     """Set each key in `updates` inside the frontmatter: replace an empty line, else append."""
-    raw, body = split_frontmatter(note_text)
+    parts = split_frontmatter(note_text)
+    if parts is None:  # callers check missing_fields() first, which needs frontmatter
+        return note_text
+    raw, body = parts
     for key, value in updates.items():
         line = f"{key}: {value}\n"
         pattern = re.compile(rf"^{re.escape(key)}:[ \t]*(?:null|~|''|\"\"|\[\])?[ \t]*\n", re.MULTILINE)

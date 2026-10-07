@@ -62,7 +62,7 @@ def published_notes(vault_blog: Path) -> list[Path]:
 
 def drift_for(note: Path, hugo_dir: Path) -> Drift:
     post = parse_obsidian_post(note.read_text(encoding="utf-8"))
-    slug = slugify(post.metadata.get("slug") or post.metadata.get("title") or note.stem)
+    slug = slugify(str(post.metadata.get("slug") or post.metadata.get("title") or note.stem))
     live_dir = existing_bundle(hugo_dir, slug)
     d = Drift(note, slug, live_dir)
     if live_dir is None:

@@ -114,7 +114,8 @@ class TestHandlePost:
         meta = frontmatter.load(bundle / "index.md").metadata
         assert meta["slug"] == "joins-explained"
         assert meta["draft"] is False
-        assert meta["cover"]["image"] == "joins.jpg"
+        cover = meta["cover"]
+        assert isinstance(cover, dict) and cover["image"] == "joins.jpg"
         assert (bundle / "joins.jpg").exists()
         assert (bundle / "diagram.png").exists()
         assert not (bundle / "linkedin-card.jpg").exists()

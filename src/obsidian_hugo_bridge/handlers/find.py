@@ -84,8 +84,7 @@ def handle_find(
         stem = re.sub(r"^\d+-", "", input_path.stem)
         source_title = stem.replace("-", " ").title()
 
-    slug = post.metadata.get("slug") or slugify(source_title)
-    slug = slugify(slug)
+    slug = slugify(str(post.metadata.get("slug") or slugify(str(source_title))))
 
     published = captured_date(post.metadata.get("captured"))
 
@@ -120,12 +119,16 @@ def handle_find(
     if description:
         hugo_meta["description"] = description
 
-    tags = [str(t).lstrip("#").strip() for t in post.metadata.get("tags") or [] if t]
+    raw_tags = post.metadata.get("tags") or []
+    if not isinstance(raw_tags, list):  # a lone `tags: python` was iterated character by character
+        raw_tags = [raw_tags]
+    tags = [str(t).lstrip("#").strip() for t in raw_tags if t]
     if tags:
         hugo_meta["tags"] = [t for t in tags if t]
 
     source_url = post.metadata.get("source_url")
     if source_url:
+        source_url = str(source_url)
         hugo_meta["source_url"] = source_url
         embed_type = detect_social_platform(source_url)
         if embed_type:
