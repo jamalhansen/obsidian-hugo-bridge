@@ -14,10 +14,10 @@ from git import Repo
 from local_first_common.cli import init_config_option, json_option, resolve_dry_run
 
 from .check import check_site
-from .core import OverwriteRefusedError
+from .core import HugoBridgeError, OverwriteRefusedError
 from .drift import drift_for, published_notes
 from .handlers.find import handle_find
-from .handlers.post import handle_post
+from .handlers.post import handle_post, promote_note
 from .site import PREVIEW_DIR, canonical_url
 from .writeback import write_back
 
@@ -106,6 +106,16 @@ def publish_post(
         bool, typer.Option("--auto-alt", help="Automatically generate alt text for images using vision LLM")
     ] = False,
     vision_model: Annotated[str, typer.Option("--vision-model", help="Vision model for alt text")] = "@vision",
+    promote: Annotated[
+        bool,
+        typer.Option(
+            "--promote", help="First move a starter's folder to blog/posts/YYYY/MM/<slug>/ (needs --vault-path)."
+        ),
+    ] = False,
+    max_width: Annotated[int, typer.Option("--max-width", help="Resize bundle images wider than this.")] = 1600,
+    keep_images: Annotated[
+        bool, typer.Option("--keep-images", help="Copy images byte for byte: no resize, no PNG-to-JPEG.")
+    ] = False,
     init_config: Annotated[bool, init_config_option(TOOL_NAME, DEFAULTS)] = False,
 ):
     """Publish a blog post. Status `published` goes live; any other status publishes as a draft."""
@@ -113,6 +123,19 @@ def publish_post(
     hugo = _hugo_dir(hugo_dir)
     if verbose:
         print(f"🚀 Publishing post: {input_file.name}")
+    if promote:
+        vault = _vault(vault_path)
+        if not vault:
+            typer.secho("Error: --promote needs --vault-path (or OBSIDIAN_VAULT_PATH).", fg=typer.colors.RED)
+            raise typer.Exit(1)
+        if dry_run:
+            print(f"[dry-run] Would promote {input_file.name} into blog/posts/ first")
+        else:
+            try:
+                input_file = promote_note(input_file, vault)
+            except HugoBridgeError as e:
+                typer.secho(f"Error: {e}", fg=typer.colors.RED)
+                raise typer.Exit(1) from e
 
     try:
         target_dir = handle_post(
@@ -127,6 +150,8 @@ def publish_post(
             auto_alt=auto_alt,
             vision_model=vision_model,
             overwrite=overwrite,
+            max_width=max_width,
+            keep_images=keep_images,
         )
     except OverwriteRefusedError as e:
         typer.echo(str(e))

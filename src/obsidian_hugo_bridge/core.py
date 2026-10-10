@@ -6,6 +6,7 @@ from pathlib import Path
 import frontmatter
 from local_first_common.cli import resolve_provider
 from local_first_common.tracking import register_tool
+from PIL import Image, UnidentifiedImageError
 
 from .utils import clean_wikilinks
 
@@ -109,6 +110,48 @@ def generate_image_alt(image_path: Path, model: str = "@vision", verbose: bool =
         return None
 
 
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
+JPEG_QUALITY = 85
+
+
+def find_images(
+    body: str,
+    source_dir: Path,
+    vault_path: Path | None = None,
+    attachment_folders: list[str] | None = None,
+    extra_images: list[str] | None = None,
+    verbose: bool = False,
+) -> dict[str, Path]:
+    """Referenced image name -> the vault file it resolves to. Nothing is written.
+
+    Searched in order: next to the note (other files there, like social cards, are not part
+    of the post), the attachment folders under the vault, then the whole vault.
+    """
+    referenced = re.findall(r"!\[.*?\]\(([^)]+)\)", body) + list(extra_images or [])
+    found: dict[str, Path] = {}
+    for name in dict.fromkeys(referenced):
+        if ".." in name or name.startswith("/"):  # keep the bundle inside its folder
+            continue
+        local = source_dir / name
+        if local.is_file() and local.suffix.lower() in IMAGE_EXTS:
+            found[name] = local
+            continue
+        if not (vault_path and vault_path.exists()):
+            continue
+        for folder in attachment_folders or []:
+            candidate = vault_path / folder / name
+            if candidate.is_file():
+                found[name] = candidate
+                break
+        else:
+            if verbose:
+                print(f"   🔍 Image not in priority folders, searching full vault: {name}")
+            matches = list(vault_path.rglob(name))
+            if matches:
+                found[name] = matches[0]
+    return found
+
+
 def copy_images(
     body: str,
     source_dir: Path,
@@ -118,69 +161,68 @@ def copy_images(
     verbose: bool = False,
     extra_images: list[str] | None = None,
 ) -> list[str]:
-    """
-    Find images in body and copy them to dest_dir.
-    Searches in:
-    1. source_dir (common for page bundles)
-    2. attachment_folders (relative to vault_path)
-    3. full vault_path (fallback rglob)
-
-    Returns list of copied image names.
-    """
-    copied = []
-    image_exts = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
-    referenced = re.findall(r"!\[.*?\]\(([^)]+)\)", body) + list(extra_images or [])
-
-    # 1. Referenced images that sit next to the note. Others in the folder (social cards,
-    # thumbnails) aren't part of the post and stay out of the bundle.
-    if source_dir.exists():
-        for img_file in source_dir.iterdir():
-            if img_file.is_file() and img_file.suffix.lower() in image_exts and img_file.name in referenced:
-                shutil.copy2(img_file, dest_dir / img_file.name)
-                copied.append(img_file.name)
-                if verbose:
-                    print(f"   ✓ Copied from source: {img_file.name}")
-
-    # 2. Referenced images found elsewhere in the vault
-
-    if vault_path and vault_path.exists():
-        dest_dir_resolved = dest_dir.resolve()
-        for img_name in referenced:
-            # Skip if already copied
-            if img_name in copied:
-                continue
-
-            # Basic security check for path traversal
-            if ".." in img_name or img_name.startswith("/"):
-                continue
-
-            dest = (dest_dir / img_name).resolve()
-            if not dest.is_relative_to(dest_dir_resolved):
-                continue
-
-            if not dest.exists():
-                # Search priority folders first
-                found = False
-                if attachment_folders:
-                    for folder in attachment_folders:
-                        search_path = vault_path / folder / img_name
-                        if search_path.exists():
-                            shutil.copy2(search_path, dest)
-                            copied.append(img_name)
-                            found = True
-                            if verbose:
-                                print(f"   ✓ Copied from attachment folder ({folder}): {img_name}")
-                            break
-
-                # Fallback to full vault search if not found
-                if not found:
-                    if verbose:
-                        print(f"   🔍 Image not in priority folders, searching full vault: {img_name}")
-                    matches = list(vault_path.rglob(img_name))
-                    if matches:
-                        shutil.copy2(matches[0], dest)
-                        copied.append(img_name)
-                        if verbose:
-                            print(f"   ✓ Copied from vault (rglob): {img_name}")
-
+    """Copy the images `find_images` resolves into dest_dir, byte for byte. Returns the copied names."""
+    copied: list[str] = []
+    for name, src in find_images(body, source_dir, vault_path, attachment_folders, extra_images, verbose).items():
+        dest = dest_dir / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        copied.append(name)
+        if verbose:
+            print(f"   ✓ Copied: {name}")
     return copied
+
+
+def _open_image(path: Path) -> Image.Image | None:
+    """The image, or None when Pillow can't read it (then it ships byte for byte)."""
+    try:
+        img = Image.open(path)
+        img.load()
+        return img
+    except (UnidentifiedImageError, OSError):
+        return None
+
+
+def _has_alpha(img: Image.Image) -> bool:
+    return img.mode in ("RGBA", "LA", "PA") or (img.mode == "P" and "transparency" in img.info)
+
+
+def published_image_name(name: str, src: Path) -> str:
+    """The name an image gets in the bundle: a PNG without transparency ships as JPEG.
+
+    Decided from the vault file alone, so a re-publish rewrites the body the same way every
+    time and the live-edit check compares like with like.
+    """
+    if src.suffix.lower() != ".png":
+        return name
+    img = _open_image(src)
+    if img is None or _has_alpha(img):
+        return name
+    return name[: -len(src.suffix)] + ".jpg"
+
+
+def publish_image(src: Path, dest: Path, max_width: int = 1600) -> str | None:
+    """Write src into the bundle at dest: resized down to max_width, and as JPEG when dest says so.
+
+    A raster the bundle would ship unchanged is copied byte for byte. Returns a one-line note
+    of what changed, or None when nothing did. The vault file is never touched.
+    """
+    img = _open_image(src) if src.suffix.lower() in (".png", ".jpg", ".jpeg") else None
+    if img is None:
+        shutil.copy2(src, dest)
+        return None
+    notes: list[str] = []
+    if img.width > max_width:
+        img = img.resize((max_width, round(img.height * max_width / img.width)), Image.Resampling.LANCZOS)
+        notes.append(f"resized to {img.width}x{img.height}")
+    to_jpeg = dest.suffix.lower() in (".jpg", ".jpeg")
+    if to_jpeg and src.suffix.lower() != dest.suffix.lower():
+        notes.append("converted to JPEG")
+    if not notes:
+        shutil.copy2(src, dest)
+        return None
+    if to_jpeg:
+        img.convert("RGB").save(dest, "JPEG", quality=JPEG_QUALITY, optimize=True)
+    else:
+        img.save(dest)
+    return f"{src.name} -> {dest.name}: {', '.join(notes)}"

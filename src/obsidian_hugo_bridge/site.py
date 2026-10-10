@@ -1,5 +1,6 @@
 """Facts about the target Hugo site: where a post's bundle lives, and its public URL."""
 
+import subprocess
 from pathlib import Path
 
 import frontmatter
@@ -57,3 +58,27 @@ def derived_bundle(hugo_dir: Path, slug: str, metadata: dict, series_position=No
     if series and isinstance(series_position, int) and not isinstance(series_position, bool):
         name = f"{series_position:02d}-{slug}"
     return blog / folder / name if folder else blog / name
+
+
+def index_is_tracked(hugo_dir: Path, index: Path) -> bool:
+    """Whether a bundle's index.md is in the site's git index, which is what makes it live.
+
+    An untracked bundle was written by an earlier publish and never shipped, so re-publishing
+    over it is not clobbering anyone's hand edits (2026-10-10: the guard refused a re-publish
+    over a bundle written ten minutes earlier). Outside a git repo everything counts as live.
+    """
+    try:
+        inside = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"], cwd=hugo_dir, capture_output=True, text=True, check=False
+        )
+    except FileNotFoundError:
+        return True
+    if inside.returncode != 0:
+        return True
+    tracked = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", "--", str(index.resolve())],
+        cwd=hugo_dir,
+        capture_output=True,
+        check=False,
+    )
+    return tracked.returncode == 0

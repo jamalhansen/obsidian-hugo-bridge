@@ -1,21 +1,29 @@
 import difflib
 import re
+import shutil
 from datetime import date, datetime
 from pathlib import Path
 
 import frontmatter
 
 from ..core import (
+    HugoBridgeError,
     OverwriteRefusedError,
     convert_body_syntax,
-    copy_images,
+    find_images,
     generate_image_alt,
     parse_obsidian_post,
+    publish_image,
+    published_image_name,
     strip_leading_h1,
 )
-from ..site import PREVIEW_DIR, derived_bundle, existing_bundle
+from ..site import PREVIEW_DIR, derived_bundle, existing_bundle, index_is_tracked
 from ..themes.papermod import normalize_papermod
 from ..utils import slugify
+
+KNOWN_STATUSES = ("outline", "draft", "published")
+STARTERS = Path("blog") / "starters"
+POSTS = Path("blog") / "posts"
 
 
 def handle_post(
@@ -31,6 +39,8 @@ def handle_post(
     vision_model: str = "@vision",
     preview: bool = False,
     overwrite: bool = True,
+    max_width: int = 1600,
+    keep_images: bool = False,
 ) -> Path:
     """Convert a vault post into a Hugo page bundle and return the bundle directory.
 
@@ -38,10 +48,20 @@ def handle_post(
     writes a draft copy under content/blog/_preview/ instead (gitignored). With
     `overwrite=False`, an existing bundle whose index.md would change is left alone and
     OverwriteRefusedError carries the diff -- the live copy may hold edits the vault lacks.
+    A bundle that isn't in the site's git is not live and is replaced without that check.
+
+    Images wider than `max_width` are resized and PNGs without transparency ship as JPEG,
+    with the body and cover rewritten to match; `keep_images` copies them byte for byte.
     """
     content = input_path.read_text(encoding="utf-8")
     post = parse_obsidian_post(content)
     source = post.metadata
+    status = str(source.get("status") or "").strip().lower()
+    if status and status not in KNOWN_STATUSES:
+        print(
+            f"   ⚠️  status '{status}' isn't one of {', '.join(KNOWN_STATUSES)}: publishing as a draft, "
+            "and calib and fm-validate won't recognise it"
+        )
 
     slug = slugify(str(slug or source.get("slug") or source.get("title") or input_path.stem))
 
@@ -60,6 +80,18 @@ def handle_post(
         print("   ✂️  Dropped the body's leading H1: Hugo renders the title")
     post.content = convert_body_syntax(post.content)
 
+    # Image names are settled before the live-edit check so a re-publish compares like with like.
+    cover = post.metadata.get("cover")
+    cover_names = [str(cover["image"])] if isinstance(cover, dict) and cover.get("image") else None
+    found = find_images(post.content, input_path.parent, vault_path, attachment_folders, cover_names, verbose)
+    renames = {} if keep_images else {n: published_image_name(n, src) for n, src in found.items()}
+    for old, new in renames.items():
+        if old == new:
+            continue
+        post.content = post.content.replace(f"]({old})", f"]({new})")
+        if isinstance(cover, dict) and cover.get("image") == old:
+            cover["image"] = new
+
     if preview:
         blog_dir = hugo_dir / PREVIEW_DIR / slug
     else:
@@ -71,22 +103,26 @@ def handle_post(
 
     index = blog_dir / "index.md"
     if not overwrite and not preview and index.exists():
-        # Checked before anything is written, images included.
-        changes = semantic_diff(frontmatter.loads(index.read_text(encoding="utf-8")), post)
-        if changes:
-            raise OverwriteRefusedError(f"{index.relative_to(hugo_dir)} (- live, + vault)\n{changes}")
+        if index_is_tracked(hugo_dir, index):
+            # Checked before anything is written, images included.
+            changes = semantic_diff(frontmatter.loads(index.read_text(encoding="utf-8")), post)
+            if changes:
+                raise OverwriteRefusedError(f"{index.relative_to(hugo_dir)} (- live, + vault)\n{changes}")
+        elif verbose:
+            print("   ℹ️  Existing bundle isn't in git, so it isn't live: replacing it")
 
     if not dry_run:
         blog_dir.mkdir(parents=True, exist_ok=True)
-        copy_images(
-            post.content,
-            input_path.parent,
-            blog_dir,
-            vault_path=vault_path,
-            attachment_folders=attachment_folders,
-            verbose=verbose,
-            extra_images=[post.metadata["cover"]["image"]] if isinstance(post.metadata.get("cover"), dict) else None,
-        )
+        for name, src in found.items():
+            dest = blog_dir / renames.get(name, name)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if keep_images:
+                shutil.copy2(src, dest)
+                note = None
+            else:
+                note = publish_image(src, dest, max_width)
+            if verbose:
+                print(f"   ✓ {note or f'Copied: {name}'}")
     else:
         print(f"[dry-run] Would copy images to: {blog_dir}")
 
@@ -171,3 +207,37 @@ def _fill_alt_text(post: frontmatter.Post, blog_dir: Path, vision_model: str, ve
             post.content = post.content.replace(f"![{old_alt}]({img_path_str})", f"![{new_alt}]({img_path_str})")
             if verbose:
                 print(f"   ✓ Generated alt for {img_path_str}: {new_alt}")
+
+
+def promote_note(note: Path, vault_path: Path, today: date | None = None) -> Path:
+    """Move a starter's folder from blog/starters/<group>/<slug>/ to blog/posts/YYYY/MM/<slug>/.
+
+    YYYY/MM comes from `published_date` when set, else today. Returns the note's new path; a
+    note that isn't under starters is left alone and its own path returned. Never clobbers an
+    existing post folder.
+    """
+    note = note.resolve()
+    root = vault_path.resolve()
+    try:
+        rel = note.relative_to(root)
+    except ValueError as e:
+        raise HugoBridgeError(f"{note} is not inside the vault {vault_path}") from e
+    if rel.parts[:2] != STARTERS.parts or len(rel.parts) != 5:
+        print(f"   ℹ️  Not a starter (expected {STARTERS}/<group>/<slug>/<note>.md): leaving {rel} where it is")
+        return note
+    raw = frontmatter.load(str(note)).metadata.get("published_date")
+    when = today or datetime.now().astimezone().date()
+    if isinstance(raw, date):
+        when = raw
+    elif raw:
+        try:
+            when = date.fromisoformat(str(raw)[:10])
+        except ValueError:
+            pass
+    dest = root / POSTS / f"{when:%Y}" / f"{when:%m}" / note.parent.name
+    if dest.exists():
+        raise HugoBridgeError(f"{dest.relative_to(root)} already exists; move the starter by hand")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(note.parent), str(dest))
+    print(f"   ✓ Promoted to {dest.relative_to(root)}")
+    return dest / note.name

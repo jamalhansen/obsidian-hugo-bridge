@@ -47,7 +47,17 @@ It exits 1 on errors, so it can gate a pre-commit hook.
   are dropped. A cover without `alt:` uses the title so it's never unlabeled.
 - **Live edits are protected.** If the live `index.md` differs from what the note would produce
   (cross-links, alt text or test annotations added in Hugo), publishing stops and prints the diff.
-  Backport the edits to the note, or pass `--overwrite`.
+  Backport the edits to the note, or pass `--overwrite`. "Live" means the bundle's `index.md` is
+  in the site's git: a bundle an earlier publish wrote and nobody committed is replaced without
+  the check (outside a git repo, everything counts as live).
+- **Images ship web-sized.** Bundle images wider than `--max-width` (1600) are resized down, and a
+  PNG without transparency ships as JPEG (quality 85) with the body and `cover.image` rewritten to
+  match. The vault file is never modified. `--keep-images` copies everything byte for byte.
+- **`--promote`** first moves a starter's folder from `blog/starters/<group>/<slug>/` to
+  `blog/posts/YYYY/MM/<slug>/` (month from `published_date`, else today; needs `--vault-path`),
+  then publishes from there. It refuses to overwrite an existing post folder.
+- **Status** should be `outline`, `draft` or `published`. Anything else publishes as a draft with a
+  warning, because calib and fm-validate don't recognise it.
 - **The vault learns what's live.** After a live publish, missing `published_date` and
   `canonical_url` are filled in on the note (line-level edit, backed up to
   `~/.local/share/obsidian-hugo-bridge/backups/` first). `--no-write-back` skips it.

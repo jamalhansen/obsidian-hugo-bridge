@@ -11,6 +11,7 @@ dependencies = [
     "gitpython>=3.1.46",
     "httpx>=0.28.1",
     "local-first-common",
+    "pillow>=12.3.0",
     "pydantic>=2.12.5",
     "python-frontmatter>=1.1.0",
     "pyyaml>=6.0.3",
