@@ -55,7 +55,12 @@ def published_notes(vault_blog: Path) -> list[Path]:
     for f in sorted(vault_blog.rglob("*.md")):
         if "posts" not in f.parts or f.name == "promo.md":
             continue
-        if str(frontmatter.load(f).metadata.get("status", "")).lower() == "published":
+        meta = frontmatter.load(f).metadata
+        category = str(meta.get("category") or "blog post").lower()
+        # A published LinkedIn post or newsletter issue in the blog tree has no live copy to drift from.
+        if "blog post" not in category:
+            continue
+        if str(meta.get("status", "")).lower() == "published":
             notes.append(f)
     return notes
 

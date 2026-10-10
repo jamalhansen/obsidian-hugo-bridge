@@ -68,3 +68,14 @@ def test_strip_leading_h1_only_when_it_repeats_the_title():
     assert strip_leading_h1(body, "Another Title") == (body, False)
     assert strip_leading_h1("## Section\n", "Section") == ("## Section\n", False)
     assert strip_leading_h1("", "Anything") == ("", False)
+
+
+def test_drift_ignores_published_notes_that_are_not_blog_posts(tmp_path):
+    from obsidian_hugo_bridge.drift import published_notes
+
+    blog = tmp_path / "blog"
+    (blog / "posts").mkdir(parents=True)
+    (blog / "posts" / "post.md").write_text("---\nstatus: published\ncategory: '[[Blog Post]]'\n---\nx\n")
+    (blog / "posts" / "linkedin.md").write_text("---\nstatus: published\ncategory: '[[LinkedIn Post]]'\n---\nx\n")
+    (blog / "posts" / "legacy.md").write_text("---\nstatus: published\n---\nx\n")
+    assert sorted(p.name for p in published_notes(blog)) == ["legacy.md", "post.md"]
