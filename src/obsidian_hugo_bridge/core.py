@@ -42,6 +42,22 @@ def parse_obsidian_post(content: str) -> frontmatter.Post:
     return post
 
 
+def strip_leading_h1(body: str, title: str) -> tuple[str, bool]:
+    """Drop a body that opens with `# <title>`: Hugo renders the title itself, so it would show twice.
+
+    Post starters carried one (calib wrote it until 2026-10-10); published posts never did.
+    Only an H1 that matches the title is dropped -- any other leading H1 is the author's.
+    """
+
+    def norm(text: str) -> str:
+        return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+    match = re.match(r"\s*#[ \t]+(.+?)[ \t]*(?:\n|$)", body)
+    if not match or not title or norm(match.group(1)) != norm(title):
+        return body, False
+    return body[match.end() :].lstrip("\n"), True
+
+
 def convert_body_syntax(body: str) -> str:
     """Convert Obsidian-specific syntax to Hugo-compatible markdown."""
     # ![[image.jpg]] -> ![Image](image.jpg)

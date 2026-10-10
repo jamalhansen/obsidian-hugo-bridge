@@ -11,6 +11,7 @@ from ..core import (
     copy_images,
     generate_image_alt,
     parse_obsidian_post,
+    strip_leading_h1,
 )
 from ..site import PREVIEW_DIR, derived_bundle, existing_bundle
 from ..themes.papermod import normalize_papermod
@@ -54,6 +55,9 @@ def handle_post(
         meta["draft"] = True
     post.metadata = {"title": meta.pop("title"), "slug": meta.pop("slug"), **meta}
 
+    post.content, dropped_h1 = strip_leading_h1(post.content, str(source.get("title") or ""))
+    if dropped_h1 and verbose:
+        print("   ✂️  Dropped the body's leading H1: Hugo renders the title")
     post.content = convert_body_syntax(post.content)
 
     if preview:

@@ -3,6 +3,7 @@ from obsidian_hugo_bridge.core import (
     HugoBridgeError,
     ImageAltError,
     convert_body_syntax,
+    strip_leading_h1,
 )
 from obsidian_hugo_bridge.themes.papermod import normalize_papermod
 from obsidian_hugo_bridge.utils import clean_wikilinks, slugify
@@ -57,3 +58,13 @@ def test_normalize_papermod():
     assert normalized["series"] == ["My Series"]
     assert "summary" not in normalized
     assert "toc" not in normalized
+
+
+def test_strip_leading_h1_only_when_it_repeats_the_title():
+    body = "# The Same Bug, Three Ways\n\n> Starter.\n\n## The hook\n"
+    assert strip_leading_h1(body, "The Same Bug, Three Ways") == ("> Starter.\n\n## The hook\n", True)
+    assert strip_leading_h1(body, "the same bug three ways") == ("> Starter.\n\n## The hook\n", True)
+    # a different H1 is the author's; a body without one is untouched
+    assert strip_leading_h1(body, "Another Title") == (body, False)
+    assert strip_leading_h1("## Section\n", "Section") == ("## Section\n", False)
+    assert strip_leading_h1("", "Anything") == ("", False)
