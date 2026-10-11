@@ -142,6 +142,26 @@ class TestHandlePost:
         handle_post(note, site)
         handle_post(note, site, overwrite=False)
 
+    def test_draft_going_live_is_not_a_live_edit(self, note, site):
+        """status: draft -> published flips draft and moves date; neither is a Hugo-side edit."""
+        import subprocess
+
+        drafted = VAULT_NOTE.replace("status: published", "status: draft")
+        note.write_text(drafted.replace("published_date: 2026-02-10", "published_date: 2026-02-01"))
+        bundle = handle_post(note, site)
+        subprocess.run(["git", "init", "-q"], cwd=site, check=True)
+        subprocess.run(["git", "add", "."], cwd=site, check=True)
+        assert frontmatter.load(bundle / "index.md").metadata["draft"] is True
+        note.write_text(VAULT_NOTE)
+        handle_post(note, site, overwrite=False)  # no refusal
+        live = frontmatter.load(bundle / "index.md").metadata
+        assert live["draft"] is False and str(live["date"]) == "2026-02-10"
+        # a body edit made in Hugo while it was still a draft is protected as before
+        index = bundle / "index.md"
+        index.write_text(index.read_text().replace("draft: false", "draft: true") + "Edited in Hugo\n")
+        with pytest.raises(OverwriteRefusedError):
+            handle_post(note, site, overwrite=False)
+
     def test_preview_is_a_draft_outside_the_published_tree(self, note, site):
         bundle = handle_post(note, site, preview=True)
         assert bundle == site / "content/blog/_preview/joins-explained"

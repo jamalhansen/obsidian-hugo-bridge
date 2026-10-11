@@ -157,9 +157,17 @@ def _comparable(value):
 
 
 def semantic_diff(live: frontmatter.Post, proposed: frontmatter.Post) -> str:
-    """What re-publishing would change, ignoring YAML formatting. Empty when nothing would."""
+    """What re-publishing would change, ignoring YAML formatting. Empty when nothing would.
+
+    A draft bundle going live is the vault's own transition, not an edit made in Hugo, so
+    `draft` and `date` (the publish day replaces the draft day) don't count then. Found
+    2026-10-10: the first `status: published` republish was refused for exactly that flip.
+    """
+    going_live = bool(live.metadata.get("draft")) and not bool(proposed.metadata.get("draft"))
     lines = []
     for key in dict.fromkeys([*live.metadata, *proposed.metadata]):
+        if going_live and key in ("draft", "date"):
+            continue
         a, b = _comparable(live.metadata.get(key)), _comparable(proposed.metadata.get(key))
         if key == "draft":  # Hugo's default
             a, b = bool(a), bool(b)
